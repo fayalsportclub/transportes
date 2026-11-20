@@ -187,14 +187,15 @@ const ocup=v=>S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='confirmado').le
 const prazoOk=data=>data>hoje()||(data===hoje()&&agoraHM()<=S.cfg.prazo);
 
 /* ===================== DISTÂNCIAS E ROTAS ===================== */
-const zona=n=>S.cfg.zonas.find(z=>z.nome===n)||S.cfg.zonas[0];
+/* cada freguesia: minutos desde a Horta e por onde se vai (E = via Pedro Miguel, O = via Feteira, I = interior) */
+const zona=n=>{const z=S.cfg.zonas.find(z=>z.nome===n)||S.cfg.zonas[0];return {pos:z.via==='O'?S.cfg.anel-z.min:z.via==='I'?0:z.min,ramal:z.via==='I'?z.min:0}};
 function km(f1,f2){
-  if(f1===f2)return 1;
+  if(f1===f2)return 2;
   const a=zona(f1),b=zona(f2),L=S.cfg.anel;
   let d=Math.abs(a.pos-b.pos);d=Math.min(d,L-d);
   return d+a.ramal+b.ramal;
 }
-const minDe=k=>k/S.cfg.vel*60;
+const minDe=k=>k;
 /* Onde fica um local, para um atleta */
 function loc(nome,aid){
   if(nome===CASA){const u=usr(atl(aid).encId);return {key:'casa:'+u.id,label:'Casa '+u.nome.split(' ').slice(-1)[0],freg:u.freg||S.cfg.base,base:false,morada:u.morada,semFreg:!u.freg}}
@@ -250,7 +251,7 @@ function avalia(r){
     const direto=minDe(km(j.o.freg,j.d.freg)),extra=(i.desce-i.sobe)-direto-c.paragem;if(extra>10)pen+=(extra-10)*1;
     if(j.tipo==='reg'){}
     else{const dlt=i.desce-j.h;if(dlt>1){pen+=dlt*10;av.push(`${j.nome.split(' ')[0]} chega ${Math.round(dlt)} min atrasado`)}else{const ce=-dlt;if(ce>c.maxCedo){pen+=c.maxCedo*.2+(ce-c.maxCedo)*2;av.push(`${j.nome.split(' ')[0]} chega ${Math.round(ce)} min antes`)}else pen+=ce*.2}}});
-  r.pen=pen;r.avisos=av;r.score=r.km+5+pen;return r;
+  r.pen=pen;r.avisos=av;r.score=r.km*0.67+5+pen;return r;
 }
 
 /* ===================== OTIMIZADOR (uma carrinha) ===================== */
@@ -347,7 +348,7 @@ const fregOpts=sel=>S.cfg.zonas.map(z=>`<option ${z.nome===sel?'selected':''}>${
 /* desenha a rota de uma viagem (paragens com horas) */
 function htmlRota(r){
   return `<div class="rota">`+r.stops.map(s=>`<div class="st"><span class="t">${hm(s.t)}</span><span class="w"><b>${esc(s.label)}</b> <span class="mut sm">· ${esc(s.freg)}</span>${s.espera>1?` <span class="mut sm">(espera ${Math.round(s.espera)} min)</span>`:''}<br>${s.sobe.length?`<span class="up">↑ ${s.sobe.map(j=>esc(j.nome.split(' ')[0])).join(', ')}</span> `:''}${s.desce.length?`<span class="dn">↓ ${s.desce.map(j=>esc(j.nome.split(' ')[0])).join(', ')}</span>`:''}</span></div>`).join('')+
-  `<div class="st mut"><span class="t" style="color:var(--mut)">${hm(r.fim)}</span><span class="w">Carrinha de volta à Horta · ${r.km} km</span></div></div>`;
+  `<div class="st mut"><span class="t" style="color:var(--mut)">${hm(r.fim)}</span><span class="w">Carrinha de volta à Horta · ${r.km} min ao volante</span></div></div>`;
 }
 
 /* ===================== LOGIN ===================== */
@@ -466,7 +467,7 @@ function aDia(){
   /* sobreposições entre viagens (só há uma carrinha) */
   const sobre=[];for(let i=1;i<rs.length;i++){const a=rs[i-1].r,b=rs[i].r;if(a&&b&&b.inicio<a.fim-0.5)sobre.push(`A viagem das ${rs[i].v.hora} começa antes de a carrinha voltar da viagem das ${rs[i-1].v.hora} (≈${hm(a.fim)}).`)}
   let h=`<div class="datenav"><button onclick="diaSel=addDias(diaSel,-1);selP.clear();render()">‹</button><div class="d">${diaSel===hoje()?'Hoje · ':diaSel===addDias(hoje(),1)?'Amanhã · ':''}${fmtD(diaSel)}<input type="date" value="${diaSel}" onchange="diaSel=this.value||hoje();selP.clear();render()" style="display:block;margin:4px auto 0;width:auto;padding:4px 8px;font-size:13px;border-width:1px"></div><button onclick="diaSel=addDias(diaSel,1);selP.clear();render()">›</button></div>
-  <div class="stats"><div class="stat"><b style="color:${pend.length?'var(--am)':'inherit'}">${pend.length}</b><span>por atribuir</span></div><div class="stat"><b>${vs.length}</b><span>viagens · ${kmDia} km</span></div><div class="stat"><b>${conf}</b><span>confirmados</span></div></div>`;
+  <div class="stats"><div class="stat"><b style="color:${pend.length?'var(--am)':'inherit'}">${pend.length}</b><span>por atribuir</span></div><div class="stat"><b>${vs.length}</b><span>viagens · ${kmDia} min</span></div><div class="stat"><b>${conf}</b><span>confirmados</span></div></div>`;
   if(pend.length)h+=`<button class="btn mag full" style="margin-top:12px" onclick="sugerir()">✨ Sugerir viagens otimizadas (${pend.length} pedidos)</button>`;
   h+=`<div class="acts"><button class="btn sec sm grow" onclick="formPedido(diaSel)">＋ Registar pedido</button><button class="btn sec sm grow" onclick="novaViagem()">＋ Viagem</button><button class="btn sm grow" onclick="partilha()" ${vs.length?'':'disabled'}>Partilhar plano</button></div>`;
   sobre.forEach(t=>h+=`<div class="warn">⚠️ ${esc(t)}</div>`);
@@ -488,7 +489,7 @@ function aDia(){
     const n=ocup(v),L=S.cfg.lugares;
     const canc=S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='cancelado');
     if(r)avalia(r);
-    h+=`<div class="card"><div class="row"><div class="hora">${esc(v.hora)}</div><div class="grow"><div class="b">${r?(r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'):'<span class="mut">Sem passageiros</span>'}</div><div class="mut sm">saída da Horta${r?' · '+r.km+' km · volta ≈'+hm(r.fim):''}${v.nota?' · '+esc(v.nota):''}</div></div><span class="chip ${n>=L?'c-r':'c-v'}">${n}/${L}</span></div>
+    h+=`<div class="card"><div class="row"><div class="hora">${esc(v.hora)}</div><div class="grow"><div class="b">${r?(r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'):'<span class="mut">Sem passageiros</span>'}</div><div class="mut sm">saída da Horta${r?' · '+r.km+' min · volta ≈'+hm(r.fim):''}${v.nota?' · '+esc(v.nota):''}</div></div><span class="chip ${n>=L?'c-r':'c-v'}">${n}/${L}</span></div>
     <div class="bar ${n>=L?'full':''}"><i style="width:${Math.min(100,n/L*100)}%"></i></div>`;
     if(r){h+=htmlRota(r);r.avisos.forEach(a=>h+=`<div class="warn" style="padding:6px 10px">${esc(a)}</div>`)}
     canc.forEach(p=>h+=`<div class="pax x"><div class="grow"><b>${esc(atl(p.atletaId).nome)}</b> <span class="chip c-r" style="text-decoration:none">cancelou</span></div></div>`);
@@ -506,17 +507,17 @@ function sugerir(){
   const res=otimizar(diaSel);ultPlano=res;
   const kmO=res.plano.reduce((s,r)=>s+r.km,0);
   let h=`<h3>✨ Plano sugerido · ${fmtD(diaSel)}</h3>
-  <div class="mut">${res.nPend} pedidos → <b>${res.plano.length} viagens · ${kmO} km</b>. Sem agrupar por zona seriam ${res.refN} viagens · ${res.refKm} km.</div>`;
+  <div class="mut">${res.nPend} pedidos → <b>${res.plano.length} viagens · ${kmO} min ao volante</b>. Sem agrupar por zona seriam ${res.refN} viagens · ${res.refKm} min.</div>`;
   const dv=res.refN-res.plano.length,dk=res.refKm-kmO;
-  if(dv>0||dk>0)h+=`<div class="ok">Poupa ${dv>0?dv+' viage'+(dv===1?'m':'ns')+' e ':''}${dk} km. Já tem em conta que só há uma carrinha.</div>`;
+  if(dv>0||dk>0)h+=`<div class="ok">Poupa ${dv>0?dv+' viage'+(dv===1?'m':'ns')+' e ':''}${dk} min de carrinha. Já tem em conta que só há uma carrinha.</div>`;
   res.plano.forEach((r,i)=>{
     const L=S.cfg.lugares;
-    h+=`<div class="card" style="margin-top:10px"><div class="row"><div class="hora">${hm(r.inicio)}</div><div class="grow"><div class="b">${r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'}</div><div class="mut sm">${r.km} km · volta à Horta ≈${hm(r.fim)}</div></div><span class="chip ${r.jobs.length>=L?'c-r':'c-v'}">${r.jobs.length}/${L}</span></div>${htmlRota(r)}`;
+    h+=`<div class="card" style="margin-top:10px"><div class="row"><div class="hora">${hm(r.inicio)}</div><div class="grow"><div class="b">${r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'}</div><div class="mut sm">${r.km} min · volta à Horta ≈${hm(r.fim)}</div></div><span class="chip ${r.jobs.length>=L?'c-r':'c-v'}">${r.jobs.length}/${L}</span></div>${htmlRota(r)}`;
     r.avisos.forEach(a=>h+=`<div class="warn" style="padding:6px 10px">⚠️ ${esc(a)}</div>`);
     h+=`</div>`;
   });
   if(res.falha.length)h+=`<div class="warn">Não foi possível encaixar: ${res.falha.map(j=>esc(j.nome)).join(', ')}.</div>`;
-  h+=`<div class="mut sm" style="margin-top:8px">Distâncias e horas são estimativas (média de ${S.cfg.vel} km/h, ${S.cfg.paragem} min por paragem). Depois de aplicar pode ajustar tudo à mão.</div>
+  h+=`<div class="mut sm" style="margin-top:8px">Horas estimadas com os tempos das Definições e ${S.cfg.paragem} min por paragem. Depois de aplicar pode ajustar tudo à mão.</div>
   <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" onclick="aplicaPlano()">Aplicar ${res.plano.length} viage${res.plano.length===1?'m':'ns'}</button></div>`;
   sheet(h);
 }
@@ -552,7 +553,7 @@ function atribuir(){
   h+=`<label class="f">Juntar a uma viagem existente</label>`;
   if(!vs.length)h+=`<div class="mut">Ainda não há viagens neste dia.</div>`;
   vs.forEach(v=>{const n=ocup(v),liv=L-n,ok=liv>=ps.length;
-    let extra='';if(ok){const atual=rotaViagem(v);const nova=rota([...(atual?atual.jobs:[]),...js],toMin(v.hora));extra=` · +${nova.km-(atual?atual.km:0)} km`}
+    let extra='';if(ok){const atual=rotaViagem(v);const nova=rota([...(atual?atual.jobs:[]),...js],toMin(v.hora));extra=` · +${nova.km-(atual?atual.km:0)} min`}
     h+=`<button class="chk ${ok?'':'dis'}" style="width:100%;text-align:left" ${ok?`onclick="fazAtrib('${v.id}')"`:''}><div class="hora" style="font-size:17px">${esc(v.hora)}</div><div class="grow"><div class="b">${n}/${L} ocupados</div><div class="mut">${ok?liv+' lugares livres'+extra:'Só '+liv+' lugar'+(liv===1?'':'es')+' livre'+(liv===1?'':'s')}</div></div></button>`});
   h+=`<label class="f">Ou criar nova viagem — saída da Horta</label><div class="row"><input type="time" id="nvh" value="${hSug}" style="flex:1"><button class="btn" onclick="fazAtrib(null)">Criar e atribuir</button></div><div class="mut sm" style="margin-top:4px">Hora sugerida calculada para cumprir os horários pedidos.</div>`;
   if(ps.length>L)h+=`<div class="warn">Selecionou ${ps.length} atletas e a carrinha só tem ${L} lugares.</div>`;
@@ -713,14 +714,14 @@ function aCfg(){
   <h2>Otimizador</h2><div class="card">
   <div class="two"><div><label class="f">Espera máx. no regresso (min)</label><input type="number" min="0" id="ce" value="${c.maxEspera}"></div><div><label class="f">Chegar antes, no máx. (min)</label><input type="number" min="0" id="cc" value="${c.maxCedo}"></div></div>
   <div class="mut sm" style="margin-top:4px">Ex.: com 30 min, os Iniciados que saem às 18:00 podem esperar pelos Juvenis das 18:30 e seguir na mesma viagem.</div>
-  <div class="two"><div><label class="f">Velocidade média (km/h)</label><input type="number" min="10" id="cv" value="${c.vel}"></div><div><label class="f">Tempo por paragem (min)</label><input type="number" min="0" id="cpa" value="${c.paragem}"></div></div>
-  <label class="f">Desvio máximo para juntar alguém «no caminho» (km)</label><input type="number" min="0" id="cdv" value="${c.desvio}">
+  <label class="f">Tempo por paragem (min)</label><input type="number" min="0" id="cpa" value="${c.paragem}">
+  <label class="f">Desvio máximo para juntar alguém «no caminho» (minutos a mais)</label><input type="number" min="0" id="cdv" value="${c.desvio}">
   </div>
   <h2>Locais habituais</h2><div class="card"><div class="mut sm" style="margin-bottom:8px">Marque «Clube» nas instalações onde se treina/joga (definem o que é ida e regresso).</div><div id="lls"></div><button class="btn gh sm" onclick="lerLoc();fLoc.push({nome:'',freg:S.cfg.base,base:false});desLoc()">＋ Local</button></div>
-  <h2>Distâncias no Faial</h2><div class="card"><div class="mut sm">Km aproximados ao longo da estrada regional, a partir da Horta, no sentido Pedro Miguel → Cedros → Capelo → Feteira. «Desvio» = km fora da estrada principal (ex.: Flamengos). <b>São estimativas — corrija com os valores que conhece.</b></div>
-  <table class="z" style="margin-top:8px"><tr class="mut sm"><td>Freguesia</td><td style="width:70px">km</td><td style="width:70px">desvio</td><td class="mut" style="width:60px">↔ Horta</td></tr>
-  ${c.zonas.map((z,i)=>`<tr><td>${esc(z.nome)}</td><td><input type="number" step="0.5" data-z="${i}" data-k="pos" value="${z.pos}"></td><td><input type="number" step="0.5" data-z="${i}" data-k="ramal" value="${z.ramal}"></td><td class="mut">${km(c.base,z.nome)} km</td></tr>`).join('')}</table>
-  <label class="f">Volta completa à ilha (km)</label><input type="number" id="can" value="${c.anel}"></div>
+  <h2>Tempos de viagem no Faial</h2><div class="card"><div class="mut sm">Minutos de carrinha <b>desde a Horta</b> até cada freguesia, e por onde se vai. <b>São estimativas — corrija com os tempos reais.</b></div>
+  <table class="z" style="margin-top:8px"><tr class="mut sm"><td>Freguesia</td><td style="width:72px">min</td><td style="width:130px">caminho</td></tr>
+  ${c.zonas.map((z,i)=>`<tr><td>${esc(z.nome)}</td><td><input type="number" min="0" data-z="${i}" data-k="min" value="${z.min}"></td><td><select data-z="${i}" data-k="via" style="padding:6px">${[['E','via Pedro Miguel'],['O','via Feteira'],['I','interior']].map(([k,l])=>`<option value="${k}" ${z.via===k?'selected':''}>${l}</option>`).join('')}</select></td></tr>`).join('')}</table>
+  <label class="f">Volta completa à ilha (min)</label><input type="number" id="can" value="${c.anel}"><div class="mut sm" style="margin-top:4px">Usado para saber qual é o caminho mais curto entre freguesias dos dois lados da ilha.</div></div>
   <button class="btn full" style="margin-top:14px" onclick="gravaCfg()">Guardar definições</button>
   <h2>Administração</h2><div class="card"><div class="mut">Palavra-passe da conta de administração</div><div class="row" style="margin-top:8px"><input type="password" id="apw" placeholder="Nova palavra-passe" style="flex:1"><button class="btn sec" onclick="mudaPassAdmin()">Alterar</button></div></div>`;
 }
@@ -730,9 +731,9 @@ async function mudaPassAdmin(){if(apw.value.length<10)return toast('Mínimo 10 c
 async function gravaCfg(){
   const c=S.cfg;lerLoc();
   c.lugares=Math.max(1,+cl.value||8);c.prazo=cp.value||'12:00';c.vSocio=+cs.value||0;c.vNaoSocio=+cn.value||0;c.diaLimite=Math.min(28,Math.max(1,+cd.value||10));
-  c.maxEspera=Math.max(0,+ce.value||0);c.maxCedo=Math.max(0,+cc.value||0);c.vel=Math.max(10,+cv.value||40);c.paragem=Math.max(0,+cpa.value||0);c.desvio=Math.max(0,+cdv.value||0);
-  c.anel=Math.max(10,+can.value||52);
-  document.querySelectorAll('[data-z]').forEach(e=>{c.zonas[e.dataset.z][e.dataset.k]=+e.value||0});
+  c.maxEspera=Math.max(0,+ce.value||0);c.maxCedo=Math.max(0,+cc.value||0);c.paragem=Math.max(0,+cpa.value||0);c.desvio=Math.max(0,+cdv.value||0);
+  c.anel=Math.max(10,+can.value||78);
+  document.querySelectorAll('[data-z]').forEach(e=>{c.zonas[e.dataset.z][e.dataset.k]=e.dataset.k==='via'?e.value:(+e.value||0)});
   c.locais=fLoc.filter(l=>l.nome);
   render();await db(sb.from('config').update({dados:c}).eq('id',1));toast('Definições guardadas');
 }
