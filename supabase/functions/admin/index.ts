@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
       const { data: c, error } = await adm.auth.admin.createUser({ email: `${user}@${DOM}`, password: b.password, email_confirm: true });
       if (error) return resp({ erro: error.message }, 400);
       const { error: e2 } = await adm.from("profiles").insert({
-        id: c.user.id, nome: b.nome, username: user, tel: b.tel || "", freg: b.freg || null, morada: b.morada || "", role: "enc", estado: "ativo",
+        id: c.user.id, nome: b.nome, username: user, tel: b.tel || "", freg: b.freg || null, morada: b.morada || "",
+        role: b.role === "gestor" ? "gestor" : "enc", estado: "ativo",
       });
       if (e2) { await adm.auth.admin.deleteUser(c.user.id); return resp({ erro: e2.message }, 400); }
       return resp({ id: c.user.id });

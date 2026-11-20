@@ -170,6 +170,8 @@ async function carrega(){
   carregado=true;
 }
 const me=()=>S.users.find(u=>u.id===sess);
+/* staff = administração ou gestor de transportes */
+const staff=()=>{const u=me();return !!u&&(u.role==='admin'||u.role==='gestor')};
 const atl=id=>S.atletas.find(a=>a.id===id);
 const usr=id=>S.users.find(u=>u.id===id);
 const valor=a=>a.isento?0:a.socio?S.cfg.vSocio:S.cfg.vNaoSocio;
@@ -414,7 +416,7 @@ function cancelar(id){confirma('Cancelar este transporte?',async()=>{const p=S.p
   await db(sb.from('pedidos').update({estado:'cancelado'}).eq('id',id));toast('Transporte cancelado')},'Sim, cancelar',true)}
 /* Formulário de pedido */
 function formPedido(dataPre){
-  const admin=me().role==='admin';
+  const admin=staff();
   const lista=admin?S.atletas.filter(a=>a.transporte&&usr(a.encId).estado==='ativo'):S.atletas.filter(a=>a.encId===me().id&&a.transporte);
   const casaOpts=admin?`<option value="Casa">Casa principal do atleta</option><option value="Casa:1">Morada adicional 1 do atleta</option><option value="Casa:2">Morada adicional 2 do atleta</option>`
     :casas(me()).map((c,i)=>`<option value="${i?'Casa:'+i:'Casa'}">${esc((i?c.nome:'Casa')+' ('+(c.freg||'?')+')')}</option>`).join('');
@@ -440,7 +442,7 @@ function lblHora(){const b=n=>{const l=S.cfg.locais.find(x=>x.nome===n);return l
 function filtraAt(){const q=fq.value.toLowerCase();document.querySelectorAll('#fat .chk').forEach(l=>l.style.display=l.dataset.s.includes(q)?'':'none')}
 function outro(sel,id){document.getElementById(id).style.display=sel.value==='__o'?'block':'none'}
 async function gravaPedido(){
-  const admin=me().role==='admin';
+  const admin=staff();
   const ats=[...document.querySelectorAll('#fat input:checked')].map(i=>i.value);
   const d=fd.value,hh=fh.value;
   const o=fo.value==='__o'?foo.value.trim():fo.value,de=fde.value==='__o'?fdeo.value.trim():fde.value;
@@ -470,8 +472,10 @@ async function gravaPedido(){
 /* ===================== ADMIN ===================== */
 let tab='dia',diaSel=hoje(),selP=new Set(),mesSel=mesAtual(),filtM='todos',qU='',ultPlano=null;
 function vAdmin(){
-  const tabs=[['dia','🗓 Dia'],['mens','💶 Mensalidades'],['users','👥 Utilizadores'],['cfg','⚙️']];
-  let h=topo('Administração')+`<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';selP.clear();render()">${l}</button>`).join('')}</div></nav><div class="wrap">`;
+  const gestor=me().role==='gestor';
+  const tabs=gestor?[['dia','🗓 Pedidos e viagens']]:[['dia','🗓 Dia'],['mens','💶 Mensalidades'],['users','👥 Utilizadores'],['cfg','⚙️']];
+  if(!tabs.some(t=>t[0]===tab))tab='dia';
+  let h=topo(gestor?me().nome+' · Gestão de transportes':'Administração')+`<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';selP.clear();render()">${l}</button>`).join('')}</div></nav><div class="wrap">`;
   h+=({dia:aDia,mens:aMens,users:aUsers,cfg:aCfg})[tab]();
   app.innerHTML=h+'</div>'+(tab==='dia'&&selP.size?`<div class="fab"><div class="in"><div class="grow b">${selP.size} selecionado${selP.size>1?'s':''}</div><button class="btn gh sm" onclick="selP.clear();render()">Limpar</button><button class="btn" onclick="atribuir()">Atribuir →</button></div></div>`:'');
 }
@@ -663,6 +667,12 @@ function aUsers(){
     <div class="acts"><button class="btn gh sm" onclick="formUser('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`;
   });
   if(!encs.length)h+=`<div class="card empty">Nenhum resultado.</div>`;
+  const gs=S.users.filter(u=>u.role==='gestor');
+  h+=`<h2>Gestores de transportes <span class="n">${gs.length}</span></h2><div class="mut sm" style="margin:-2px 2px 8px">Gerem pedidos e viagens e articulam com a condutora. Não veem mensalidades, utilizadores nem definições.</div>`;
+  gs.forEach(u=>{const sus=u.estado==='suspenso';
+    h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
+    <div class="acts"><button class="btn gh sm" onclick="formGestor('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`});
+  h+=`<button class="btn sec full" onclick="formGestor()">＋ Novo gestor de transportes</button>`;
   return h;
 }
 function estadoU(id,e){
@@ -674,7 +684,7 @@ function estadoU(id,e){
   if(e==='suspenso')confirma(`Suspender ${u.nome}? Deixa de conseguir entrar e os pedidos futuros pendentes são cancelados.`,faz,'Suspender',true);
   else faz();
 }
-function credMsg(u,pass){return `Olá ${u.nome.split(' ')[0]}! Já pode pedir os transportes do Fayal Sport Club em:\n${location.origin+location.pathname}\n\nUtilizador: ${u.username}\nPalavra-passe: ${pass}\n\nNo telemóvel, use «Adicionar ao ecrã principal» para ficar com a aplicação.\nPedidos para o próprio dia até às ${S.cfg.prazo}.`}
+function credMsg(u,pass){return `Olá ${u.nome.split(' ')[0]}! Já pode ${u.role==='gestor'?'gerir':'pedir'} os transportes do Fayal Sport Club em:\n${location.origin+location.pathname}\n\nUtilizador: ${u.username}\nPalavra-passe: ${pass}\n\nNo telemóvel, use «Adicionar ao ecrã principal» para ficar com a aplicação.${u.role==='gestor'?'':'\nPedidos para o próprio dia até às '+S.cfg.prazo+'.'}`}
 function mostraCred(u,tit,pass){
   const t=credMsg(u,pass),tel=u.tel.replace(/\D/g,'');
   sheet(`<h3>${tit}</h3><div class="mut">A palavra-passe só aparece agora. Envie-a já ao encarregado.</div><pre class="msg">${esc(t)}</pre><div class="acts"><button class="btn grow" id="ccp">Copiar mensagem</button><a class="btn sec grow" style="text-align:center;text-decoration:none" href="https://wa.me/${tel.length===9?'351'+tel:tel}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">Enviar por WhatsApp</a></div><div class="acts"><button class="btn gh full" onclick="fecha()">Fechar</button></div>`);
@@ -699,6 +709,27 @@ function formUser(id){
   desAt();
 }
 function avFreg(){const z=S.cfg.zonas.find(z=>z.nome===uf.value);ufv.innerHTML=z&&z.restrita?'<span style="color:var(--vm)">Freguesia na zona vedada: os atletas só têm transporte se marcar «Autorizado» com a decisão da Comissão.</span>':''}
+function formGestor(id){
+  const u=id?usr(id):null;
+  sheet(`<h3>${u?'Editar gestor de transportes':'Novo gestor de transportes'}</h3><div class="mut sm">Acesso aos pedidos, à sugestão automática e à criação de viagens.</div>
+  <label class="f">Nome</label><input type="text" id="gn" value="${esc(u?u.nome:'')}" ${u?'':'oninput="if(!gu._m)gu.value=sugUser(this.value)"'}>
+  <div class="two"><div><label class="f">Telemóvel</label><input type="tel" id="gt" value="${esc(u?u.tel:'')}"></div><div><label class="f">Utilizador</label><input type="text" id="gu" autocapitalize="none" value="${esc(u?u.username:'')}" oninput="this._m=1"></div></div>
+  <div class="err" id="ge"></div>
+  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="ggb" onclick="gravaGestor('${id||''}')">${u?'Guardar':'Criar e gerar acesso'}</button></div>`);
+}
+async function gravaGestor(id){
+  const nome=gn.value.trim(),tel=gt.value.trim(),user=gu.value.trim().toLowerCase(),err=t=>ge.textContent=t;
+  if(!nome)return err('Indique o nome.');
+  if(!/^[a-z0-9._-]{3,40}$/.test(user))return err('Utilizador: só letras minúsculas, números, ponto ou hífen (mín. 3).');
+  if(S.users.some(u=>u.username===user&&u.id!==id))return err('Esse utilizador já existe.');
+  ggb.disabled=true;err('A gravar…');
+  try{
+    if(id){const u=usr(id);if(u.username!==user){await fn({acao:'username',id,username:user});u.username=user}
+      Object.assign(u,{nome,tel});await db(sb.from('profiles').update({nome,tel}).eq('id',id));fecha();render();toast('Guardado')}
+    else{const pass=genPass();const r=await fn({acao:'criar',role:'gestor',username:user,password:pass,nome,tel});
+      const u={id:r.id,nome,tel,username:user,freg:null,role:'gestor',estado:'ativo',morada:'',moradas:[]};S.users.push(u);render();mostraCred(u,'Acesso criado',pass)}
+  }catch(x){ggb.disabled=false;err(x.message)}
+}
 function sugUser(n){const p=n.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(Boolean);if(!p.length)return'';let b=p[0]+(p.length>1?'.'+p[p.length-1]:''),s=b,i=2;while(S.users.some(u=>u.username===s))s=b+i++;return s}
 function desAt(){uat.innerHTML=fAt.map((a,i)=>`<div class="card" style="padding:10px;margin-bottom:8px"><div class="atl"><input type="text" placeholder="Nome do atleta" value="${esc(a.nome)}" data-i="${i}" data-k="nome"><input type="text" list="esc" placeholder="Escalão" value="${esc(a.escalao)}" data-i="${i}" data-k="escalao"><button class="btn gh sm" onclick="lerAt();fAt.splice(${i},1);desAt()">✕</button></div>
   <div class="row" style="gap:16px"><label class="sw"><input type="checkbox" data-i="${i}" data-k="socio" ${a.socio?'checked':''}> Sócio (${S.cfg.vSocio} €)</label><label class="sw"><input type="checkbox" data-i="${i}" data-k="transporte" ${a.transporte?'checked':''}> Usa transporte</label></div>
@@ -782,7 +813,7 @@ async function gravaCfg(){
 function render(){
   const u=me();
   if(!sess||!u||u.estado==='suspenso'||!S.cfg)return vLogin();
-  u.role==='admin'?vAdmin():vEnc();
+  staff()?vAdmin():vEnc();
   if(tab==='cfg'&&u.role==='admin'&&document.getElementById('lls'))desLoc();
 }
 (async()=>{app.innerHTML='<div class="empty" style="margin-top:30vh">A carregar…</div>';await carrega();render()})();
