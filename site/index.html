@@ -136,8 +136,8 @@ const snake=o=>Object.fromEntries(Object.entries(o).filter(([k,v])=>v!==undefine
 const camel=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k.replace(/_([a-z])/g,(m,c)=>c.toUpperCase()),v]));
 const pick=(o,ks)=>Object.fromEntries(ks.filter(k=>k in o).map(k=>[k,o[k]]));
 const COL={pedidos:['id','atletaId','data','hora','origem','destino','obs','estado','viagemId','motivo','porAdmin','prevSobe','prevDesce'],
-  viagens:['id','data','hora','nota'],atletas:['id','encId','nome','escalao','socio','transporte','inicio','autorizado','isento','decisao'],pagamentos:['atletaId','mes','metodo','data'],
-  profiles:['nome','tel','freg','morada','moradas']};
+  viagens:['id','data','hora','nota'],atletas:['id','encId','nome','escalao','socio','nSocio','transporte','inicio','autorizado','isento','decisao'],pagamentos:['atletaId','mes','metodo','data'],
+  profiles:['nome','tel','freg','morada','moradas','socio','nSocio']};
 const linha=(t,o)=>snake(pick(o,COL[t]));
 /* executa uma escrita; se falhar, avisa e volta a carregar os dados do servidor */
 async function db(q){
@@ -156,9 +156,11 @@ async function carrega(){
   if(!session){sess=null;return}
   sess=session.user.id;
   const desde=addDias(hoje(),-90);
+  const {data:eu}=await sb.from('profiles').select('role').eq('id',sess).maybeSingle();
+  const fin=eu&&eu.role==='financeiro';
   const [c,pr,at,pe,vi,pa]=await Promise.all([
     sb.from('config').select('dados').eq('id',1).single(),
-    sb.from('profiles').select('*'),
+    fin?sb.rpc('fin_familias'):sb.from('profiles').select('*'),
     sb.from('atletas').select('*'),
     sb.from('pedidos').select('*').gte('data',desde),
     sb.from('viagens').select('*').gte('data',desde),
@@ -174,7 +176,11 @@ const me=()=>S.users.find(u=>u.id===sess);
 const staff=()=>{const u=me();return !!u&&(u.role==='admin'||u.role==='gestor')};
 const atl=id=>S.atletas.find(a=>a.id===id);
 const usr=id=>S.users.find(u=>u.id===id);
-const valor=a=>a.isento?0:a.socio?S.cfg.vSocio:S.cfg.vNaoSocio;
+/* sócio: o próprio atleta ou o encarregado (que beneficia todos os filhos) */
+const socioPor=a=>{if(a.socio)return 'atleta';const u=usr(a.encId);return u&&u.socio?'enc':''};
+const ehSocio=a=>!!socioPor(a);
+const socioTxt=a=>{const s=socioPor(a);return s==='atleta'?'Sócio':s==='enc'?'Sócio (pelo encarregado)':'Não sócio'};
+const valor=a=>a.isento?0:ehSocio(a)?S.cfg.vSocio:S.cfg.vNaoSocio;
 /* atleta mora no perímetro vedado (cidade, Flamengos, Feteira, P. Almoxarife) sem autorização da Comissão */
 const fregVedada=f=>{const z=S.cfg.zonas.find(z=>z.nome===f);return !!(z&&z.restrita)};
 const vedado=a=>{const u=usr(a.encId);return !a.autorizado&&!!u&&fregVedada(u.freg)};
@@ -407,7 +413,7 @@ function vEnc(){
     ${p.estado==='recusado'&&p.motivo?`<div class="mut" style="margin-top:6px">${esc(p.motivo)}</div>`:''}</div>`;
   });
   h+=`<h2>Mensalidades · ${fmtM(m)}</h2><div class="card">`;
-  meus.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${a.isento?'Isento':(a.socio?'Sócio':'Não sócio')+' · '+valor(a)+' €/mês'}</div></div>${a.isento?`<span class="chip c-b">Isento</span>`:pg?`<span class="chip c-v">Pago</span>`:atraso(a)?`<span class="chip c-r">Em atraso</span>`:`<span class="chip c-a">Por pagar · até dia ${S.cfg.diaLimite}</span>`}</div>`});
+  meus.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${a.isento?'Isento':socioTxt(a)+' · '+valor(a)+' €/mês'}</div></div>${a.isento?`<span class="chip c-b">Isento</span>`:pg?`<span class="chip c-v">Pago</span>`:atraso(a)?`<span class="chip c-r">Em atraso</span>`:`<span class="chip c-a">Por pagar · até dia ${S.cfg.diaLimite}</span>`}</div>`});
   h+=`<div class="mut" style="margin-top:8px;font-size:13px">Pagamento em numerário ou MB Way, junto do clube.</div></div>`;
   h+=`<p class="mut" style="text-align:center;font-size:13px;margin-top:18px">Pedidos para o próprio dia até às ${esc(S.cfg.prazo)}.<br>As horas de recolha são estimativas.</p></div>`;
   app.innerHTML=h;
@@ -472,11 +478,12 @@ async function gravaPedido(){
 /* ===================== ADMIN ===================== */
 let tab='dia',diaSel=hoje(),selP=new Set(),mesSel=mesAtual(),filtM='todos',qU='',ultPlano=null;
 function vAdmin(){
-  const gestor=me().role==='gestor';
-  const tabs=gestor?[['dia','🗓 Pedidos e viagens']]:[['dia','🗓 Dia'],['mens','💶 Mensalidades'],['users','👥 Utilizadores'],['cfg','⚙️']];
-  if(!tabs.some(t=>t[0]===tab))tab='dia';
-  let h=topo(gestor?me().nome+' · Gestão de transportes':'Administração')+`<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';selP.clear();render()">${l}</button>`).join('')}</div></nav><div class="wrap">`;
-  h+=({dia:aDia,mens:aMens,users:aUsers,cfg:aCfg})[tab]();
+  const role=me().role,gestor=role==='gestor';
+  const tabs=gestor?[['dia','🗓 Pedidos e viagens']]:role==='financeiro'?[['mens','💶 Mensalidades'],['socios','🪪 Sócios']]
+    :[['dia','🗓 Dia'],['mens','💶 Pagam.'],['socios','🪪 Sócios'],['users','👥 Utiliz.'],['cfg','⚙️']];
+  if(!tabs.some(t=>t[0]===tab))tab=tabs[0][0];
+  let h=topo(gestor?me().nome+' · Gestão de transportes':role==='financeiro'?me().nome+' · Gestão financeira':'Administração')+`<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';selP.clear();render()">${l}</button>`).join('')}</div></nav><div class="wrap">`;
+  h+=({dia:aDia,mens:aMens,socios:aSocios,users:aUsers,cfg:aCfg})[tab]();
   app.innerHTML=h+'</div>'+(tab==='dia'&&selP.size?`<div class="fab"><div class="in"><div class="grow b">${selP.size} selecionado${selP.size>1?'s':''}</div><button class="btn gh sm" onclick="selP.clear();render()">Limpar</button><button class="btn" onclick="atribuir()">Atribuir →</button></div></div>`:'');
 }
 /* ---- DIA ---- */
@@ -644,7 +651,7 @@ function aMens(){
     if(filtM==='falta')la=la.filter(a=>!pago(a.id,m));if(filtM==='pagos')la=la.filter(a=>pago(a.id,m));
     if(!la.length)return;any=true;
     h+=`<div class="card"><div class="row"><div class="grow b">${esc(u.nome)}</div>${u.estado==='suspenso'?'<span class="chip c-g">suspenso</span>':''}<span class="mut">${esc(u.tel)}</span></div>`;
-    la.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${a.socio?'Sócio':'Não sócio'} · ${valor(a)} €</div></div>`+
+    la.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${socioTxt(a)} · ${valor(a)} €</div></div>`+
       (pg?`<span class="chip c-v">✓ ${pg.metodo==='mbway'?'MB Way':'Dinheiro'} · ${pg.data.slice(8,10)}/${pg.data.slice(5,7)}</span><button class="btn gh sm" onclick="anulaPag('${a.id}')" title="Anular">↺</button>`
       :`<button class="btn sm" onclick="paga('${a.id}','dinheiro')">💶 Dinheiro</button><button class="btn sm" style="background:var(--az)" onclick="paga('${a.id}','mbway')">MB Way</button>`)+`</div>`});
     h+=`</div>`;
@@ -652,6 +659,28 @@ function aMens(){
   if(!any)h+=`<div class="card empty">Nada a mostrar.</div>`;
   return h;
 }
+let qS='';
+function aSocios(){
+  const q=qS.toLowerCase();
+  const encs=S.users.filter(u=>u.role==='enc'&&(u.nome+' '+(u.nSocio||'')+' '+S.atletas.filter(a=>a.encId===u.id).map(a=>a.nome+' '+(a.nSocio||'')).join(' ')).toLowerCase().includes(q)).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const ats=S.atletas.filter(a=>a.transporte);
+  const nS=ats.filter(ehSocio).length;
+  let h=`<div class="stats"><div class="stat"><b>${nS}</b><span>atletas com preço de sócio</span></div><div class="stat"><b>${ats.length-nS}</b><span>não sócios</span></div><div class="stat"><b>${S.users.filter(u=>u.role==='enc'&&u.socio).length}</b><span>encarregados sócios</span></div></div>
+  <input type="text" placeholder="Procurar nome ou n.º de sócio…" value="${esc(qS)}" oninput="qS=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const i=document.querySelector('.wrap input');i.focus();i.setSelectionRange(99,99)},250)" style="margin-top:12px">
+  <div class="mut sm" style="margin:8px 2px">Se o <b>encarregado</b> for sócio, todos os filhos pagam o valor de sócio (${S.cfg.vSocio} €). Também pode marcar só o atleta.</div>`;
+  encs.forEach(u=>{const as=S.atletas.filter(a=>a.encId===u.id);
+    h+=`<div class="card"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut sm">Encarregado</div></div>
+      <input type="text" value="${esc(u.nSocio||'')}" placeholder="N.º" style="width:80px;padding:6px" onchange="nSocio('p','${u.id}',this.value)">
+      <label class="sw"><input type="checkbox" ${u.socio?'checked':''} onchange="marcaSocio('p','${u.id}',this.checked)"> Sócio</label></div>`;
+    as.forEach(a=>{h+=`<div class="pax"><div class="grow"><div>${esc(a.nome)}</div><div class="mut sm">${a.isento?'Isento':socioTxt(a)+' · '+valor(a)+' €/mês'}</div></div>
+      <input type="text" value="${esc(a.nSocio||'')}" placeholder="N.º" style="width:80px;padding:6px" onchange="nSocio('a','${a.id}',this.value)">
+      <label class="sw"><input type="checkbox" ${a.socio?'checked':''} onchange="marcaSocio('a','${a.id}',this.checked)"> Sócio</label></div>`});
+    h+=`</div>`});
+  if(!encs.length)h+=`<div class="card empty">Nenhum resultado.</div>`;
+  return h;
+}
+async function marcaSocio(t,id,v){const o=t==='p'?usr(id):atl(id);o.socio=v;render();await db(t==='p'?sb.rpc('fin_socio_enc',{pid:id,s:v,n:o.nSocio||''}):sb.from('atletas').update({socio:v}).eq('id',id));toast(v?'Marcado como sócio':'Deixou de ser sócio')}
+async function nSocio(t,id,v){const o=t==='p'?usr(id):atl(id);o.nSocio=v.trim();await db(t==='p'?sb.rpc('fin_socio_enc',{pid:id,s:!!o.socio,n:o.nSocio}):sb.from('atletas').update({n_socio:o.nSocio}).eq('id',id));toast('N.º de sócio guardado')}
 async function paga(aid,met){const pg={atletaId:aid,mes:mesSel,metodo:met,data:hoje()};S.pags.push(pg);render();await db(sb.from('pagamentos').insert(linha('pagamentos',pg)));toast('Pagamento registado')}
 function anulaPag(aid){confirma('Anular este pagamento?',async()=>{S.pags=S.pags.filter(p=>!(p.atletaId===aid&&p.mes===mesSel));render();await db(sb.from('pagamentos').delete().eq('atleta_id',aid).eq('mes',mesSel))},'Anular',true)}
 /* ---- UTILIZADORES ---- */
@@ -663,16 +692,19 @@ function aUsers(){
     const as=S.atletas.filter(a=>a.encId===u.id),sus=u.estado==='suspenso';
     h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)} · <b>${esc(u.freg||'sem freguesia')}</b>${u.morada?' · '+esc(u.morada):''}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
     ${!u.freg?'<div class="warn" style="padding:6px 10px">Sem freguesia — o otimizador assume a Horta.</div>':''}${(u.moradas||[]).length?`<div class="mut sm">+ ${(u.moradas||[]).map(m=>esc(m.nome)+' ('+esc(m.freg)+')').join(' · ')}</div>`:''}
-    <div style="margin-top:6px">${as.map(a=>`<span class="chip ${a.transporte?'c-b':'c-g'}" style="margin:2px 4px 2px 0">${esc(a.nome.split(' ')[0])} · ${a.isento?'isento':a.socio?'sócio':'não sócio'}${a.autorizado?' · autorizado':''}${vedado(a)?' · 🚫 zona vedada':''}${atraso(a)?' · ⚠️':''}</span>`).join('')}</div>
+    <div style="margin-top:6px">${as.map(a=>`<span class="chip ${a.transporte?'c-b':'c-g'}" style="margin:2px 4px 2px 0">${esc(a.nome.split(' ')[0])} · ${a.isento?'isento':socioPor(a)==='enc'?'sócio (enc.)':ehSocio(a)?'sócio':'não sócio'}${a.autorizado?' · autorizado':''}${vedado(a)?' · 🚫 zona vedada':''}${atraso(a)?' · ⚠️':''}</span>`).join('')}</div>
     <div class="acts"><button class="btn gh sm" onclick="formUser('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`;
   });
   if(!encs.length)h+=`<div class="card empty">Nenhum resultado.</div>`;
-  const gs=S.users.filter(u=>u.role==='gestor');
-  h+=`<h2>Gestores de transportes <span class="n">${gs.length}</span></h2><div class="mut sm" style="margin:-2px 2px 8px">Gerem pedidos e viagens e articulam com a condutora. Não veem mensalidades, utilizadores nem definições.</div>`;
-  gs.forEach(u=>{const sus=u.estado==='suspenso';
-    h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
-    <div class="acts"><button class="btn gh sm" onclick="formGestor('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`});
-  h+=`<button class="btn sec full" onclick="formGestor()">＋ Novo gestor de transportes</button>`;
+  [['gestor','Gestores de transportes','Gerem pedidos e viagens e articulam com a condutora. Não veem mensalidades, utilizadores nem definições.','＋ Novo gestor de transportes'],
+   ['financeiro','Gestores financeiros','Registam pagamentos e indicam quem é sócio. Não veem pedidos, viagens, moradas nem definições.','＋ Novo gestor financeiro']].forEach(([rl,tit,desc,bt])=>{
+    const gs=S.users.filter(u=>u.role===rl);
+    h+=`<h2>${tit} <span class="n">${gs.length}</span></h2><div class="mut sm" style="margin:-2px 2px 8px">${desc}</div>`;
+    gs.forEach(u=>{const sus=u.estado==='suspenso';
+      h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
+      <div class="acts"><button class="btn gh sm" onclick="formGestor('${u.id}','${rl}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`});
+    h+=`<button class="btn sec full" style="margin-bottom:6px" onclick="formGestor('','${rl}')">${bt}</button>`;
+  });
   return h;
 }
 function estadoU(id,e){
@@ -684,7 +716,7 @@ function estadoU(id,e){
   if(e==='suspenso')confirma(`Suspender ${u.nome}? Deixa de conseguir entrar e os pedidos futuros pendentes são cancelados.`,faz,'Suspender',true);
   else faz();
 }
-function credMsg(u,pass){return `Olá ${u.nome.split(' ')[0]}! Já pode ${u.role==='gestor'?'gerir':'pedir'} os transportes do Fayal Sport Club em:\n${location.origin+location.pathname}\n\nUtilizador: ${u.username}\nPalavra-passe: ${pass}\n\nNo telemóvel, use «Adicionar ao ecrã principal» para ficar com a aplicação.${u.role==='gestor'?'':'\nPedidos para o próprio dia até às '+S.cfg.prazo+'.'}`}
+function credMsg(u,pass){return `Olá ${u.nome.split(' ')[0]}! Já pode ${u.role==='gestor'?'gerir os':u.role==='financeiro'?'gerir as mensalidades dos':'pedir os'} transportes do Fayal Sport Club em:\n${location.origin+location.pathname}\n\nUtilizador: ${u.username}\nPalavra-passe: ${pass}\n\nNo telemóvel, use «Adicionar ao ecrã principal» para ficar com a aplicação.${u.role!=='enc'?'':'\nPedidos para o próprio dia até às '+S.cfg.prazo+'.'}`}
 function mostraCred(u,tit,pass){
   const t=credMsg(u,pass),tel=u.tel.replace(/\D/g,'');
   sheet(`<h3>${tit}</h3><div class="mut">A palavra-passe só aparece agora. Envie-a já ao encarregado.</div><pre class="msg">${esc(t)}</pre><div class="acts"><button class="btn grow" id="ccp">Copiar mensagem</button><a class="btn sec grow" style="text-align:center;text-decoration:none" href="https://wa.me/${tel.length===9?'351'+tel:tel}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">Enviar por WhatsApp</a></div><div class="acts"><button class="btn gh full" onclick="fecha()">Fechar</button></div>`);
@@ -700,6 +732,8 @@ function formUser(id){
   <div class="two"><div><label class="f">Telemóvel</label><input type="tel" id="ut" value="${esc(u?u.tel:'')}"></div><div><label class="f">Utilizador</label><input type="text" id="uu" autocapitalize="none" value="${esc(u?u.username:'')}" oninput="this._m=1"></div></div>
   <div class="two"><div><label class="f">Freguesia</label><select id="uf" onchange="avFreg()"><option value="">— escolher —</option>${fregOpts(u?u.freg:'')}</select></div><div><label class="f">Morada / lugar</label><input type="text" id="um" value="${esc(u?u.morada:'')}" placeholder="Ex.: Canada do Pilar, 12"></div></div>
   <div class="mut sm" id="ufv" style="margin-top:6px"></div>
+  <div class="row" style="gap:10px;margin-top:10px"><label class="sw"><input type="checkbox" id="usoc" ${u&&u.socio?'checked':''}> Encarregado é sócio (todos os filhos pagam ${S.cfg.vSocio} €)</label></div>
+  <input type="text" id="unso" value="${esc(u?u.nSocio||'':'')}" placeholder="N.º de sócio do encarregado (opcional)" style="margin-top:6px;padding:8px">
   <label class="f">Moradas adicionais (opcional — pais separados, avós…)</label>
   ${[0,1].map(i=>{const m=(u&&u.moradas&&u.moradas[i])||{};return `<div class="card" style="padding:10px;margin-bottom:8px"><div class="two"><input type="text" id="mn${i}" value="${esc(m.nome||'')}" placeholder="Ex.: Casa do pai / Casa dos avós"><select id="mf${i}"><option value="">— freguesia —</option>${fregOpts(m.freg||'')}</select></div><input type="text" id="mm${i}" value="${esc(m.morada||'')}" placeholder="Morada / lugar" style="margin-top:6px"></div>`}).join('')}
   <label class="f">Atletas</label><div id="uat"></div><button class="btn gh sm" onclick="lerAt();fAt.push({id:uid(),nome:'',escalao:'',socio:false,transporte:true,inicio:mesAtual(),autorizado:false,isento:false,decisao:''});desAt()">＋ Adicionar atleta</button>
@@ -709,15 +743,15 @@ function formUser(id){
   desAt();
 }
 function avFreg(){const z=S.cfg.zonas.find(z=>z.nome===uf.value);ufv.innerHTML=z&&z.restrita?'<span style="color:var(--vm)">Freguesia na zona vedada: os atletas só têm transporte se marcar «Autorizado» com a decisão da Comissão.</span>':''}
-function formGestor(id){
-  const u=id?usr(id):null;
-  sheet(`<h3>${u?'Editar gestor de transportes':'Novo gestor de transportes'}</h3><div class="mut sm">Acesso aos pedidos, à sugestão automática e à criação de viagens.</div>
+function formGestor(id,rl='gestor'){
+  const u=id?usr(id):null,nm=rl==='financeiro'?'gestor financeiro':'gestor de transportes';
+  sheet(`<h3>${u?'Editar '+nm:'Novo '+nm}</h3><div class="mut sm">${rl==='financeiro'?'Acesso às mensalidades e ao registo de sócios.':'Acesso aos pedidos, à sugestão automática e à criação de viagens.'}</div>
   <label class="f">Nome</label><input type="text" id="gn" value="${esc(u?u.nome:'')}" ${u?'':'oninput="if(!gu._m)gu.value=sugUser(this.value)"'}>
   <div class="two"><div><label class="f">Telemóvel</label><input type="tel" id="gt" value="${esc(u?u.tel:'')}"></div><div><label class="f">Utilizador</label><input type="text" id="gu" autocapitalize="none" value="${esc(u?u.username:'')}" oninput="this._m=1"></div></div>
   <div class="err" id="ge"></div>
-  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="ggb" onclick="gravaGestor('${id||''}')">${u?'Guardar':'Criar e gerar acesso'}</button></div>`);
+  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="ggb" onclick="gravaGestor('${id||''}','${rl}')">${u?'Guardar':'Criar e gerar acesso'}</button></div>`);
 }
-async function gravaGestor(id){
+async function gravaGestor(id,rl='gestor'){
   const nome=gn.value.trim(),tel=gt.value.trim(),user=gu.value.trim().toLowerCase(),err=t=>ge.textContent=t;
   if(!nome)return err('Indique o nome.');
   if(!/^[a-z0-9._-]{3,40}$/.test(user))return err('Utilizador: só letras minúsculas, números, ponto ou hífen (mín. 3).');
@@ -726,13 +760,13 @@ async function gravaGestor(id){
   try{
     if(id){const u=usr(id);if(u.username!==user){await fn({acao:'username',id,username:user});u.username=user}
       Object.assign(u,{nome,tel});await db(sb.from('profiles').update({nome,tel}).eq('id',id));fecha();render();toast('Guardado')}
-    else{const pass=genPass();const r=await fn({acao:'criar',role:'gestor',username:user,password:pass,nome,tel});
-      const u={id:r.id,nome,tel,username:user,freg:null,role:'gestor',estado:'ativo',morada:'',moradas:[]};S.users.push(u);render();mostraCred(u,'Acesso criado',pass)}
+    else{const pass=genPass();const r=await fn({acao:'criar',role:rl,username:user,password:pass,nome,tel});
+      const u={id:r.id,nome,tel,username:user,freg:null,role:rl,estado:'ativo',morada:'',moradas:[]};S.users.push(u);render();mostraCred(u,'Acesso criado',pass)}
   }catch(x){ggb.disabled=false;err(x.message)}
 }
 function sugUser(n){const p=n.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(Boolean);if(!p.length)return'';let b=p[0]+(p.length>1?'.'+p[p.length-1]:''),s=b,i=2;while(S.users.some(u=>u.username===s))s=b+i++;return s}
 function desAt(){uat.innerHTML=fAt.map((a,i)=>`<div class="card" style="padding:10px;margin-bottom:8px"><div class="atl"><input type="text" placeholder="Nome do atleta" value="${esc(a.nome)}" data-i="${i}" data-k="nome"><input type="text" list="esc" placeholder="Escalão" value="${esc(a.escalao)}" data-i="${i}" data-k="escalao"><button class="btn gh sm" onclick="lerAt();fAt.splice(${i},1);desAt()">✕</button></div>
-  <div class="row" style="gap:16px"><label class="sw"><input type="checkbox" data-i="${i}" data-k="socio" ${a.socio?'checked':''}> Sócio (${S.cfg.vSocio} €)</label><label class="sw"><input type="checkbox" data-i="${i}" data-k="transporte" ${a.transporte?'checked':''}> Usa transporte</label></div>
+  <div class="row" style="gap:16px"><label class="sw"><input type="checkbox" data-i="${i}" data-k="socio" ${a.socio?'checked':''}> Atleta sócio</label><input type="text" data-i="${i}" data-k="nSocio" value="${esc(a.nSocio||'')}" placeholder="N.º sócio" style="width:110px;padding:6px"><label class="sw"><input type="checkbox" data-i="${i}" data-k="transporte" ${a.transporte?'checked':''}> Usa transporte</label></div>
   <div class="mut sm" style="margin:8px 0 2px">Exceções aprovadas pela Comissão de Gestão</div>
   <div class="row" style="gap:16px;flex-wrap:wrap"><label class="sw"><input type="checkbox" data-i="${i}" data-k="autorizado" ${a.autorizado?'checked':''}> Autorizado (zona vedada)</label><label class="sw"><input type="checkbox" data-i="${i}" data-k="isento" ${a.isento?'checked':''}> Isento de mensalidade</label></div>
   <input type="text" data-i="${i}" data-k="decisao" value="${esc(a.decisao||'')}" placeholder="Referência da decisão (ex.: ata n.º 12, 15/11/2026)" style="margin-top:6px;padding:8px"></div>`).join('')||'<div class="mut" style="margin-bottom:8px">Sem atletas.</div>'}
@@ -756,19 +790,19 @@ async function gravaUser(id){
   try{
     if(id){u=usr(id);
       if(u.username!==user){await fn({acao:'username',id,username:user});u.username=user}
-      Object.assign(u,{nome,tel,freg,morada:um.value.trim(),moradas});
+      Object.assign(u,{nome,tel,freg,morada:um.value.trim(),moradas,socio:usoc.checked,nSocio:unso.value.trim()});
       await db(sb.from('profiles').update(linha('profiles',u)).eq('id',id));
     }else{
       pass=genPass();
       const r=await fn({acao:'criar',username:user,password:pass,nome,tel,freg,morada:um.value.trim()});
       u={id:r.id,nome,tel,username:user,freg,role:'enc',estado:'ativo',morada:um.value.trim(),moradas:[]};S.users.push(u);
-      if(moradas.length){u.moradas=moradas;await db(sb.from('profiles').update({moradas}).eq('id',u.id))}
+      u.moradas=moradas;u.socio=usoc.checked;u.nSocio=unso.value.trim();await db(sb.from('profiles').update({moradas,socio:u.socio,n_socio:u.nSocio}).eq('id',u.id));
     }
   }catch(x){ugb.disabled=false;return err(x.message)}
   const keep=ats.map(a=>a.id);
   const rem=S.atletas.filter(a=>a.encId===u.id&&!keep.includes(a.id)).map(a=>a.id);
   S.atletas=S.atletas.filter(a=>a.encId!==u.id||keep.includes(a.id));
-  const linhas=ats.map(a=>{const o={id:a.id,encId:u.id,nome:a.nome,escalao:a.escalao,socio:!!a.socio,transporte:!!a.transporte,inicio:a.inicio||mesAtual(),autorizado:!!a.autorizado,isento:!!a.isento,decisao:a.decisao||''};const ex=S.atletas.find(x=>x.id===a.id);ex?Object.assign(ex,o):S.atletas.push(o);return linha('atletas',o)});
+  const linhas=ats.map(a=>{const o={id:a.id,encId:u.id,nome:a.nome,escalao:a.escalao,socio:!!a.socio,nSocio:a.nSocio||'',transporte:!!a.transporte,inicio:a.inicio||mesAtual(),autorizado:!!a.autorizado,isento:!!a.isento,decisao:a.decisao||''};const ex=S.atletas.find(x=>x.id===a.id);ex?Object.assign(ex,o):S.atletas.push(o);return linha('atletas',o)});
   await db(sb.from('atletas').upsert(linhas));
   if(rem.length)await db(sb.from('atletas').delete().in('id',rem));
   render();
@@ -813,7 +847,7 @@ async function gravaCfg(){
 function render(){
   const u=me();
   if(!sess||!u||u.estado==='suspenso'||!S.cfg)return vLogin();
-  staff()?vAdmin():vEnc();
+  u.role!=='enc'?vAdmin():vEnc();
   if(tab==='cfg'&&u.role==='admin'&&document.getElementById('lls'))desLoc();
 }
 (async()=>{app.innerHTML='<div class="empty" style="margin-top:30vh">A carregar…</div>';await carrega();render()})();
