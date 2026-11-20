@@ -1,0 +1,90 @@
+name: Publicar
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['keepalive.txt', 'README.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      DOM: transportes.fayalsportclub.pt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar segredos
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD REF; do
+            if [ -z "${!v}" ]; then echo "::error::Falta o segredo $v"; exit 1; fi
+          done
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Base de dados (migrações)
+        run: |
+          supabase link --project-ref "$REF" -p "$SUPABASE_DB_PASSWORD"
+          supabase db push -p "$SUPABASE_DB_PASSWORD" --include-all
+
+      - name: Função de administração
+        run: supabase functions deploy admin --project-ref "$REF" --no-verify-jwt --use-api
+
+      - name: Chaves e configuração de login
+        run: |
+          KEYS=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/api-keys?reveal=true")
+          PUB=$(echo "$KEYS" | jq -r '[.[]|select(.name=="anon")][0].api_key // empty')
+          [ -z "$PUB" ] && PUB=$(echo "$KEYS" | jq -r '[.[]|select(.type=="publishable")][0].api_key // empty')
+          SRV=$(echo "$KEYS" | jq -r '[.[]|select(.name=="service_role")][0].api_key // empty')
+          [ -z "$SRV" ] && SRV=$(echo "$KEYS" | jq -r '[.[]|select(.type=="secret")][0].api_key // empty')
+          echo "::add-mask::$SRV"
+          echo "PUB=$PUB" >> "$GITHUB_ENV"
+          echo "SRV=$SRV" >> "$GITHUB_ENV"
+          curl -sf -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d '{"disable_signup":true,"mailer_autoconfirm":true,"password_min_length":6,"site_url":"https://fayalsportclub.github.io/transportes/"}' > /dev/null
+          echo "Configuração de login aplicada"
+
+      - name: Conta de administrador (só na primeira vez)
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then echo "::warning::Sem ADMIN_PASSWORD — conta admin não criada"; exit 0; fi
+          URL="https://$REF.supabase.co"
+          H=(-H "apikey: $SRV" -H "Content-Type: application/json")
+          case "$SRV" in sb_*) ;; *) H+=(-H "Authorization: Bearer $SRV");; esac
+          N=$(curl -sf "${H[@]}" "$URL/rest/v1/profiles?username=eq.admin&select=id" | jq length)
+          if [ "$N" != "0" ]; then echo "Administrador já existe"; exit 0; fi
+          BODY=$(jq -n --arg e "admin@$DOM" --arg p "$ADMIN_PASSWORD" '{email:$e,password:$p,email_confirm:true}')
+          ID=$(curl -sf "${H[@]}" -X POST "$URL/auth/v1/admin/users" -d "$BODY" | jq -r .id)
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then echo "::error::Não foi possível criar o administrador"; exit 1; fi
+          curl -sf "${H[@]}" -X POST "$URL/rest/v1/profiles" \
+            -d "$(jq -n --arg id "$ID" '{id:$id,nome:"Administração FSC",username:"admin",role:"admin",estado:"ativo"}')" > /dev/null
+          echo "Administrador criado"
+
+      - name: Preparar site
+        run: |
+          echo "window.SB_URL='https://$REF.supabase.co';window.SB_KEY='$PUB';" > site/config.js
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: pages
+        uses: actions/deploy-pages@v4

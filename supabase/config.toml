@@ -1,0 +1,4 @@
+project_id = "transportes-fsc"
+
+[functions.admin]
+verify_jwt = false

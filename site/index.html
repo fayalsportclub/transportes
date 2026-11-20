@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transportes FSC</title>
+<meta name="theme-color" content="#0b6b3a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Transportes FSC">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--v:#0b6b3a;--v2:#0e8a4b;--vc:#e7f4ec;--txt:#17201b;--mut:#66736b;--bd:#dfe6e1;--bg:#f5f7f6;--am:#b7791f;--amc:#fdf3e1;--vm:#b42318;--vmc:#fdecea;--az:#1d5fa8;--azc:#e8f0fb}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:16px;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 110px}
+header.top{background:var(--v);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+header.top .in{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:10px}
+header.top h1{font-size:17px;margin:0;flex:1;font-weight:650}
+header.top small{opacity:.8;font-weight:400;display:block;font-size:12px}
+.lnk{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;padding:4px}
+.demo{background:#fff8e1;color:#7a5a00;font-size:12.5px;text-align:center;padding:6px 10px;border-bottom:1px solid #f1e2b3}
+.tabs{background:#fff;border-bottom:1px solid var(--bd);position:sticky;top:52px;z-index:4;overflow-x:auto}
+.tabs .in{max-width:640px;margin:0 auto;display:flex;width:100%}
+.tabs button{flex:1;border:0;background:none;padding:12px 6px;font-weight:600;color:var(--mut);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:14.5px}
+.tabs button.on{color:var(--v);border-bottom-color:var(--v)}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:22px 2px 8px;font-weight:650;display:flex;align-items:center;gap:8px}
+h2 .n{background:var(--bd);color:var(--txt);border-radius:10px;padding:1px 8px;font-size:12px;letter-spacing:0}
+.card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.mut{color:var(--mut);font-size:14px}
+.sm{font-size:13px}
+.b{font-weight:650}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--v);color:#fff}
+.btn:active{transform:scale(.98)}
+.btn.sec{background:#fff;color:var(--v);border:1.5px solid var(--v)}
+.btn.gh{background:var(--bg);color:var(--txt);border:1px solid var(--bd)}
+.btn.red{background:#fff;color:var(--vm);border:1.5px solid #f1b7b0}
+.btn.sm{padding:7px 11px;font-size:14px;border-radius:9px}
+.btn.full{width:100%;padding:14px}
+.btn.mag{background:linear-gradient(135deg,#0b6b3a,#1d8a5a)}
+.btn:disabled{opacity:.45}
+.chip{display:inline-block;border-radius:20px;padding:3px 10px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.c-v{background:var(--vc);color:var(--v)}.c-a{background:var(--amc);color:var(--am)}.c-r{background:var(--vmc);color:var(--vm)}.c-g{background:var(--bg);color:var(--mut);border:1px solid var(--bd)}.c-b{background:var(--azc);color:var(--az)}
+label.f{display:block;font-size:13.5px;font-weight:600;color:var(--mut);margin:12px 0 5px}
+input[type=text],input[type=password],input[type=date],input[type=time],input[type=number],input[type=tel],select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--bd);border-radius:10px;background:#fff;color:var(--txt)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--v2)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--bd);border-radius:10px;margin-bottom:7px;background:#fff;cursor:pointer}
+.chk.on{border-color:var(--v2);background:var(--vc)}
+.chk.dis{opacity:.55;cursor:not-allowed}
+.chk input{width:20px;height:20px;accent-color:var(--v)}
+.login{max-width:380px;margin:9vh auto 0;padding:0 18px}
+.logo{width:68px;height:68px;border-radius:50%;background:var(--v);color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px}
+.err{color:var(--vm);font-size:14px;margin-top:10px;min-height:18px}
+.bar{height:8px;background:var(--bg);border-radius:8px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--v2)}
+.bar.full i{background:var(--vm)}
+.pax{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--bg)}
+.pax:first-of-type{border-top:0}
+.pax.x{text-decoration:line-through;color:var(--mut)}
+.hora{font-weight:750;font-size:19px;color:var(--v);min-width:56px}
+.sel{outline:2.5px solid var(--v2);background:var(--vc)}
+.fab{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--bd);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:6}
+.fab .in{max-width:640px;margin:0 auto;display:flex;gap:8px;align-items:center}
+.datenav{display:flex;align-items:center;gap:8px;margin-top:14px}
+.datenav .d{flex:1;text-align:center;font-weight:700;font-size:17px}
+.datenav button{width:42px;height:42px;border-radius:50%;border:1px solid var(--bd);background:#fff;font-size:19px;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:21px}
+.stat span{font-size:12px;color:var(--mut)}
+.filt{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.filt button{border:1px solid var(--bd);background:#fff;border-radius:20px;padding:6px 13px;font-size:14px;cursor:pointer}
+.filt button.on{background:var(--v);color:#fff;border-color:var(--v)}
+.ov{position:fixed;inset:0;background:rgba(10,20,15,.45);z-index:20;display:none;align-items:flex-end;justify-content:center}
+.ov.on{display:flex}
+.sheet{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 6px;font-size:18px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1f2a24;color:#fff;padding:10px 16px;border-radius:10px;font-size:14.5px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.on{opacity:1}
+pre.msg{white-space:pre-wrap;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px;font-family:inherit;font-size:14.5px;margin:10px 0}
+.empty{text-align:center;color:var(--mut);padding:22px 10px;font-size:14.5px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.atl{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px}
+.sw{display:flex;align-items:center;gap:6px;font-size:13.5px;white-space:nowrap}
+.sw input{width:18px;height:18px;accent-color:var(--v)}
+.warn{background:var(--amc);color:#7a4f0a;border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.ok{background:var(--vc);color:var(--v);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.rota{margin-top:8px;border-left:3px solid var(--vc);padding-left:10px}
+.st{display:flex;gap:8px;padding:4px 0;font-size:14px}
+.st .t{font-weight:700;min-width:44px;color:var(--v)}
+.st .w{flex:1}
+.up{color:var(--az);font-weight:600}.dn{color:var(--am);font-weight:600}
+table.z{width:100%;border-collapse:collapse;font-size:14px}
+table.z td{padding:4px 3px;border-top:1px solid var(--bg)}
+table.z input{padding:6px 8px}
+.lrow{display:grid;grid-template-columns:1.4fr 1fr auto auto;gap:6px;align-items:center;margin-bottom:6px}
+.lrow select,.lrow input[type=text]{padding:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="ov" id="ov"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ===================== UTILITÁRIOS ===================== */
+const pad=n=>String(n).padStart(2,'0');
+const isoD=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const hoje=()=>isoD(new Date());
+const agoraHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const mesAtual=()=>hoje().slice(0,7);
+const addDias=(iso,n)=>{const d=new Date(iso+'T12:00');d.setDate(d.getDate()+n);return isoD(d)};
+const addMes=(m,n)=>{const [y,mm]=m.split('-').map(Number);const d=new Date(y,mm-1+n,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+const DS=['dom','seg','ter','qua','qui','sex','sáb'];
+const MS=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const fmtD=iso=>{const d=new Date(iso+'T12:00');return DS[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)};
+const fmtM=m=>{const [y,mm]=m.split('-');return MS[+mm-1]+' '+y};
+const uid=()=>crypto.randomUUID();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const genPass=()=>{const c='abcdefghjkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<6;i++)s+=c[Math.floor(Math.random()*c.length)];return s};
+const toMin=h=>{const [a,b]=h.split(':').map(Number);return a*60+b};
+const hm=m=>{m=Math.round(m);return pad(Math.floor(m/60)%24)+':'+pad(m%60)};
+const CASA='Casa';
+
+/* ===================== LIGAÇÃO AO SUPABASE ===================== */
+const DOM='transportes.fayalsportclub.pt';
+const sb=window.supabase.createClient(window.SB_URL,window.SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+let S={cfg:null,users:[],atletas:[],pedidos:[],viagens:[],pags:[]};
+let sess=null,carregado=false;
+const snake=o=>Object.fromEntries(Object.entries(o).filter(([k,v])=>v!==undefined).map(([k,v])=>[k.replace(/[A-Z]/g,c=>'_'+c.toLowerCase()),v]));
+const camel=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k.replace(/_([a-z])/g,(m,c)=>c.toUpperCase()),v]));
+const pick=(o,ks)=>Object.fromEntries(ks.filter(k=>k in o).map(k=>[k,o[k]]));
+const COL={pedidos:['id','atletaId','data','hora','origem','destino','obs','estado','viagemId','motivo','porAdmin','prevSobe','prevDesce'],
+  viagens:['id','data','hora','nota'],atletas:['id','encId','nome','escalao','socio','transporte','inicio'],pagamentos:['atletaId','mes','metodo','data'],
+  profiles:['nome','tel','freg','morada']};
+const linha=(t,o)=>snake(pick(o,COL[t]));
+/* executa uma escrita; se falhar, avisa e volta a carregar os dados do servidor */
+async function db(q){
+  const r=await q;
+  if(r&&r.error){console.error(r.error);toast('Não foi possível gravar: '+(r.error.message||'erro'));await carrega();render();throw r.error}
+  return r;
+}
+async function fn(body){
+  const {data,error}=await sb.functions.invoke('admin',{body});
+  if(error){let m=error.message;try{const j=await error.context.json();m=j.erro||m}catch(e){};throw new Error(m)}
+  if(data&&data.erro)throw new Error(data.erro);
+  return data;
+}
+async function carrega(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){sess=null;return}
+  sess=session.user.id;
+  const desde=addDias(hoje(),-90);
+  const [c,pr,at,pe,vi,pa]=await Promise.all([
+    sb.from('config').select('dados').eq('id',1).single(),
+    sb.from('profiles').select('*'),
+    sb.from('atletas').select('*'),
+    sb.from('pedidos').select('*').gte('data',desde),
+    sb.from('viagens').select('*').gte('data',desde),
+    sb.from('pagamentos').select('*').gte('mes',addMes(mesAtual(),-14))]);
+  const err=[c,pr,at,pe,vi,pa].find(r=>r.error);
+  if(err){console.error(err.error);toast('Erro a carregar dados');}
+  S={cfg:c.data?c.data.dados:null,users:(pr.data||[]).map(camel),atletas:(at.data||[]).map(camel),pedidos:(pe.data||[]).map(camel),
+     viagens:(vi.data||[]).map(camel),pags:(pa.data||[]).map(r=>{r=camel(r);return r})};
+  carregado=true;
+}
+const me=()=>S.users.find(u=>u.id===sess);
+const atl=id=>S.atletas.find(a=>a.id===id);
+const usr=id=>S.users.find(u=>u.id===id);
+const valor=a=>a.socio?S.cfg.vSocio:S.cfg.vNaoSocio;
+const pago=(aid,m)=>S.pags.find(p=>p.atletaId===aid&&p.mes===m);
+function atraso(a){
+  const m=mesAtual(),dia=new Date().getDate();
+  for(const mm of [addMes(m,-2),addMes(m,-1),m]){
+    if(mm<a.inicio||pago(a.id,mm))continue;
+    if(mm<m)return mm;
+    if(dia>S.cfg.diaLimite)return mm;
+  }
+  return null;
+}
+const ocup=v=>S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='confirmado').length;
+const prazoOk=data=>data>hoje()||(data===hoje()&&agoraHM()<=S.cfg.prazo);
+
+/* ===================== DISTÂNCIAS E ROTAS ===================== */
+const zona=n=>S.cfg.zonas.find(z=>z.nome===n)||S.cfg.zonas[0];
+function km(f1,f2){
+  if(f1===f2)return 1;
+  const a=zona(f1),b=zona(f2),L=S.cfg.anel;
+  let d=Math.abs(a.pos-b.pos);d=Math.min(d,L-d);
+  return d+a.ramal+b.ramal;
+}
+const minDe=k=>k/S.cfg.vel*60;
+/* Onde fica um local, para um atleta */
+function loc(nome,aid){
+  if(nome===CASA){const u=usr(atl(aid).encId);return {key:'casa:'+u.id,label:'Casa '+u.nome.split(' ').slice(-1)[0],freg:u.freg||S.cfg.base,base:false,morada:u.morada,semFreg:!u.freg}}
+  const l=S.cfg.locais.find(x=>x.nome===nome);
+  if(l)return {key:'l:'+l.nome,label:l.nome,freg:l.freg,base:!!l.base};
+  const n=nome.toLowerCase();
+  const z=S.cfg.zonas.find(z=>n.includes(z.nome.toLowerCase().replace(/^horta \((.*)\)$/,'$1')));
+  return {key:'o:'+nome,label:nome,freg:z?z.nome:S.cfg.base,base:false,semFreg:!z};
+}
+const locLabel=(nome,aid)=>nome===CASA?'Casa ('+(usr(atl(aid).encId).freg||'?')+')':nome;
+/* pedido -> tarefa: 'ida' (vai para o treino/jogo) ou 'reg' (regressa de uma instalação do clube) */
+function job(p){
+  const o=loc(p.origem,p.atletaId),d=loc(p.destino,p.atletaId);
+  return {p,id:p.id,tipo:o.base&&!d.base?'reg':'ida',h:toMin(p.hora),o,d,nome:atl(p.atletaId).nome};
+}
+/* melhor ordem de visita entre heurísticas simples (a ilha é um anel) */
+function ordem(ini,stops,fim,lat){
+  if(stops.length<2)return stops;
+  const L=S.cfg.anel,p0=zona(ini).pos,cw=s=>(zona(s.freg).pos-p0+L)%L,dH=s=>km(ini,s.freg);
+  const cands=[[...stops].sort((a,b)=>cw(a)-cw(b)),[...stops].sort((a,b)=>cw(b)-cw(a)),[...stops].sort((a,b)=>dH(a)-dH(b)),[...stops].sort((a,b)=>dH(b)-dH(a))];
+  const near=[];let cur=ini,rest=[...stops];while(rest.length){rest.sort((a,b)=>km(cur,a.freg)-km(cur,b.freg));const s=rest.shift();near.push(s);cur=s.freg}cands.push(near);
+  const cost=o=>{let c=0,acc=0,f=ini;o.forEach(s=>{c+=km(f,s.freg);acc+=c;f=s.freg});return c+km(f,fim)+(lat?0.2*acc:0)};
+  return cands.sort((a,b)=>cost(a)-cost(b))[0];
+}
+/* simula uma viagem: parte da base (Horta) à hora 'partida' (minutos) e volta à base */
+function rota(jobs,partida){
+  const B=S.cfg.base;
+  const grp=(arr)=>{const m=new Map();arr.forEach(([L,j,acao])=>{if(!m.has(L.key))m.set(L.key,{label:L.label,freg:L.freg,sobe:[],desce:[],pronto:0,morada:L.morada});const s=m.get(L.key);s[acao].push(j);if(acao==='sobe'&&j.tipo==='reg')s.pronto=Math.max(s.pronto,j.h)});return [...m.values()]};
+  const idas=jobs.filter(j=>j.tipo==='ida'),regs=jobs.filter(j=>j.tipo==='reg');
+  const f1=grp(idas.map(j=>[j.o,j,'sobe']));
+  const f2=grp([...idas.map(j=>[j.d,j,'desce']),...regs.map(j=>[j.o,j,'sobe'])]).sort((a,b)=>b.desce.length-a.desce.length);
+  const f3=grp(regs.map(j=>[j.d,j,'desce']));
+  const v0=f2.length?f2[0].freg:B;
+  const o1=ordem(B,f1,v0,false),o3=ordem(f2.length?f2[f2.length-1].freg:B,f3,B,true);
+  const stops=[...o1,...f2,...o3];
+  let t=partida,k=0,cur=B;
+  stops.forEach(s=>{const d=km(cur,s.freg);k+=d;t+=minDe(d);if(s.pronto>t){s.espera=s.pronto-t;t=s.pronto}s.t=t;t+=S.cfg.paragem;cur=s.freg});
+  const dv=km(cur,B);k+=dv;t+=minDe(dv);
+  const info={};
+  stops.forEach(s=>{s.sobe.forEach(j=>{(info[j.id]=info[j.id]||{}).sobe=s.t});s.desce.forEach(j=>{(info[j.id]=info[j.id]||{}).desce=s.t})});
+  return {jobs,stops,km:Math.round(k),inicio:partida,fim:t,info,tipo:idas.length&&regs.length?'mista':regs.length?'reg':'ida'};
+}
+/* rota de uma viagem gravada */
+function rotaViagem(v){
+  const js=S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='confirmado').map(job);
+  return js.length?rota(js,toMin(v.hora)):null;
+}
+/* penalizações: espera no regresso, chegada cedo ou atrasada na ida */
+function avalia(r){
+  const c=S.cfg;let pen=0;const av=[];
+  r.jobs.forEach(j=>{const i=r.info[j.id];
+    if(j.tipo==='reg'){const w=i.sobe-j.h;if(w>c.maxEspera){pen+=c.maxEspera*.3+(w-c.maxEspera)*1.5;av.push(`${j.nome.split(' ')[0]} espera ${Math.round(w)} min`)}else pen+=w*.3}
+    const direto=minDe(km(j.o.freg,j.d.freg)),extra=(i.desce-i.sobe)-direto-c.paragem;if(extra>10)pen+=(extra-10)*1;
+    if(j.tipo==='reg'){}
+    else{const dlt=i.desce-j.h;if(dlt>1){pen+=dlt*10;av.push(`${j.nome.split(' ')[0]} chega ${Math.round(dlt)} min atrasado`)}else{const ce=-dlt;if(ce>c.maxCedo){pen+=c.maxCedo*.2+(ce-c.maxCedo)*2;av.push(`${j.nome.split(' ')[0]} chega ${Math.round(ce)} min antes`)}else pen+=ce*.2}}});
+  r.pen=pen;r.avisos=av;r.score=r.km+5+pen;return r;
+}
+
+/* ===================== OTIMIZADOR (uma carrinha) ===================== */
+function otimizar(dia){
+  const c=S.cfg,cap=c.lugares,B=c.base;
+  const fixos=S.viagens.filter(v=>v.data===dia).map(rotaViagem).filter(Boolean).map(r=>[r.inicio,r.fim]);
+  const pend=S.pedidos.filter(p=>p.data===dia&&p.estado==='pendente').map(job);
+  const soloDur=j=>{const r=rota([j],0);return r.info[j.id].desce};
+  const chave=j=>j.tipo==='reg'?j.h:j.h-soloDur(j);
+  const livre=(blocos,a,b)=>!blocos.some(([x,y])=>a<y-0.5&&b>x+0.5);
+  /* encaixa a viagem na agenda da carrinha: tenta a hora ideal, ou antes/depois dos blocos ocupados */
+  function encaixa(js,partida,blocos){
+    const base=rota(js,partida);const dur=base.fim-base.inicio;
+    const reg=js[0].tipo==='reg';
+    const cands=[partida];
+    blocos.forEach(([x,y])=>{if(y>partida||!reg)cands.push(y);if(!reg)cands.push(x-dur)});
+    let best=null;
+    cands.forEach(p=>{if(p<0||p<partida-0.5&&reg)return;let r=rota(js,p);
+      const w=r.stops[0]&&r.stops[0].espera;if(reg&&w>0.5){r=rota(js,p+w)}
+      if(!livre(blocos,r.inicio,r.fim))return;avalia(r);if(!best||r.score<best.score)best=r});
+    return best;
+  }
+  /* constrói a viagem a partir de uma "semente" e de uma hora alvo; modo 'zona' só junta quem fica no caminho */
+  function constroi(seed,alvo,pool,blocos,modo){
+    const ok=j=>j.tipo===seed.tipo&&(seed.tipo==='reg'?(j.h<=alvo&&alvo<=j.h+c.maxEspera):(j.h>=alvo&&j.h<=alvo+c.maxCedo));
+    let js=[seed];
+    const partidaDe=set=>{if(seed.tipo==='reg'){const r=rota(set,0);const v=r.stops.find(s=>s.sobe.length);return alvo-(v?v.t:0)}const r=rota(set,0);const v=r.stops.find(s=>s.desce.length);return alvo-(v?v.t:0)};
+    const cand=pool.filter(j=>j!==seed&&ok(j));
+    const out=[];const add=()=>{const r=encaixa([...js],partidaDe(js),blocos);if(r)out.push(r)};
+    add();
+    while(js.length<cap){
+      const r0=rota(js,0).km;let bestJ=null,bestD=1e9;
+      cand.forEach(j=>{if(js.includes(j))return;const d=rota([...js,j],0).km-r0;if(d<bestD){bestD=d;bestJ=j}});
+      if(!bestJ)break;
+      js.push(bestJ);
+      if(modo==='zona'&&bestD>c.desvio){if(modo==='zona')break}
+      add();
+    }
+    return out;
+  }
+  function opcoes(seed,pool,blocos,todas){
+    const alvos=[seed.h];
+    if(seed.tipo==='reg')pool.forEach(j=>{if(j.tipo==='reg'&&j.h>seed.h&&j.h<=seed.h+c.maxEspera&&!alvos.includes(j.h))alvos.push(j.h)});
+    const out=[];
+    alvos.forEach(a=>out.push(...constroi(seed,a,pool,blocos,'todos')));
+    if(!todas)return out.sort((a,b)=>(a.score+12*(0))/a.jobs.length-b.score/b.jobs.length).slice(0,1);
+    return out;
+  }
+  function greedy(pool,blocos){
+    let tot=0;pool=[...pool];blocos=[...blocos];
+    while(pool.length){pool.sort((a,b)=>chave(a)-chave(b));const o=opcoes(pool[0],pool,blocos,false)[0];if(!o){tot+=500;pool.shift();continue}
+      tot+=o.score;blocos.push([o.inicio,o.fim]);pool=pool.filter(j=>!o.jobs.includes(j))}
+    return tot;
+  }
+  let pool=[...pend],blocos=[...fixos];const plano=[],falha=[];
+  while(pool.length){
+    pool.sort((a,b)=>chave(a)-chave(b));
+    const k0=chave(pool[0]);let best=null;
+    pool.filter(j=>chave(j)<=k0+1).slice(0,5).flatMap(sd=>opcoes(sd,pool,blocos,true)).forEach(o=>{const rest=pool.filter(j=>!o.jobs.includes(j));const sc=o.score+greedy(rest,[...blocos,[o.inicio,o.fim]]);if(!best||sc<best.sc)best={o,sc}});
+    if(!best){falha.push(pool[0]);pool.shift();continue}
+    plano.push(best.o);blocos.push([best.o.inicio,best.o.fim]);pool=pool.filter(j=>!best.o.jobs.includes(j));
+  }
+  plano.sort((a,b)=>a.inicio-b.inicio);
+  /* referência: uma viagem por cada hora/local pedido, sem agrupar por zona */
+  const g={};pend.forEach(j=>{const k=j.tipo+j.h+(j.tipo==='reg'?j.o.key:j.d.key);(g[k]=g[k]||[]).push(j)});
+  let refKm=0,refN=0;Object.values(g).forEach(arr=>{for(let i=0;i<arr.length;i+=cap){refN++;refKm+=rota(arr.slice(i,i+cap),0).km}});
+  return {plano,falha,refKm,refN,nPend:pend.length};
+}
+
+/* ===================== UI BASE ===================== */
+const app=document.getElementById('app');
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2300)}
+function sheet(html){document.getElementById('sheet').innerHTML=html;document.getElementById('ov').classList.add('on');document.getElementById('sheet').scrollTop=0}
+function fecha(){document.getElementById('ov').classList.remove('on')}
+document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')fecha()});
+function confirma(txt,ok,lbl='Confirmar',red=false){
+  sheet(`<h3>${esc(txt)}</h3><div class="acts" style="margin-top:16px"><button class="btn gh grow" onclick="fecha()">Voltar</button><button class="btn ${red?'red':''} grow" id="okb">${lbl}</button></div>`);
+  document.getElementById('okb').onclick=()=>{fecha();ok()};
+}
+function copiar(txt){try{navigator.clipboard.writeText(txt).then(()=>toast('Copiado'),()=>toast('Selecione o texto e copie manualmente'))}catch(e){toast('Selecione o texto e copie manualmente')}}
+function topo(sub){
+  return `<header class="top"><div class="in"><h1>🚐 Transportes FSC<small>${esc(sub||me().nome)}</small></h1><button class="lnk" onclick="atualizar()" title="Atualizar">↻</button><button class="lnk" onclick="sair()">Sair</button></div></header>`;
+}
+async function atualizar(){await carrega();render();toast('Atualizado')}
+async function sair(){await sb.auth.signOut();sess=null;S={cfg:null,users:[],atletas:[],pedidos:[],viagens:[],pags:[]};render()}
+function estChip(p){
+  if(p.estado==='confirmado'){const t=job(p).tipo;
+    return `<span class="chip c-v" style="white-space:normal">Confirmado${p.prevSobe?' · '+(t==='reg'?'saída ≈'+p.prevSobe+(p.prevDesce?' · chega ≈'+p.prevDesce:''):'recolha ≈'+p.prevSobe):''}</span>`}
+  if(p.estado==='pendente')return `<span class="chip c-a">A aguardar</span>`;
+  if(p.estado==='recusado')return `<span class="chip c-r">Sem lugar</span>`;
+  return `<span class="chip c-g">Cancelado</span>`;
+}
+const fregOpts=sel=>S.cfg.zonas.map(z=>`<option ${z.nome===sel?'selected':''}>${esc(z.nome)}</option>`).join('');
+/* desenha a rota de uma viagem (paragens com horas) */
+function htmlRota(r){
+  return `<div class="rota">`+r.stops.map(s=>`<div class="st"><span class="t">${hm(s.t)}</span><span class="w"><b>${esc(s.label)}</b> <span class="mut sm">· ${esc(s.freg)}</span>${s.espera>1?` <span class="mut sm">(espera ${Math.round(s.espera)} min)</span>`:''}<br>${s.sobe.length?`<span class="up">↑ ${s.sobe.map(j=>esc(j.nome.split(' ')[0])).join(', ')}</span> `:''}${s.desce.length?`<span class="dn">↓ ${s.desce.map(j=>esc(j.nome.split(' ')[0])).join(', ')}</span>`:''}</span></div>`).join('')+
+  `<div class="st mut"><span class="t" style="color:var(--mut)">${hm(r.fim)}</span><span class="w">Carrinha de volta à Horta · ${r.km} km</span></div></div>`;
+}
+
+/* ===================== LOGIN ===================== */
+function vLogin(){
+  app.innerHTML=`<div class="login"><div class="logo">🚐</div><h2 style="justify-content:center;font-size:20px;text-transform:none;letter-spacing:0;color:var(--txt);margin:0 0 4px">Transportes FSC</h2>
+  <p class="mut" style="text-align:center;margin:0 0 18px">Fayal Sport Club</p>
+  <form id="lf"><label class="f">Utilizador</label><input type="text" id="lu" autocapitalize="none" autocomplete="username">
+  <label class="f">Palavra-passe</label><input type="password" id="lp" autocomplete="current-password">
+  <div class="err" id="le"></div><button class="btn full" id="lb">Entrar</button></form>
+  <p class="mut" style="text-align:center;margin-top:18px;font-size:13px">Esqueceu-se da palavra-passe? Contacte o clube.</p></div>`;
+  document.getElementById('lf').onsubmit=async e=>{
+    e.preventDefault();lb.disabled=true;le.textContent='';
+    const u=lu.value.trim().toLowerCase();
+    const {error}=await sb.auth.signInWithPassword({email:u+'@'+DOM,password:lp.value});
+    if(error){lb.disabled=false;le.textContent=/banned/i.test(error.message)?'Conta suspensa. Contacte o clube.':'Utilizador ou palavra-passe errados.';return}
+    await carrega();
+    if(!me()||me().estado==='suspenso'){await sb.auth.signOut();sess=null;lb.disabled=false;le.textContent='Conta suspensa ou sem perfil. Contacte o clube.';return}
+    render();
+  };
+}
+/* ===================== ENCARREGADO ===================== */
+function vEnc(){
+  const u=me(),meus=S.atletas.filter(a=>a.encId===u.id&&a.transporte),ids=meus.map(a=>a.id);
+  const ped=S.pedidos.filter(p=>ids.includes(p.atletaId)&&p.data>=hoje()).sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+  const m=mesAtual();
+  let h=topo()+`<div class="wrap">`;
+  const at=meus.filter(a=>atraso(a));
+  if(at.length)h+=`<div class="warn" style="margin-top:14px">⚠️ Mensalidade em atraso: ${at.map(a=>esc(a.nome.split(' ')[0])+' ('+fmtM(atraso(a))+')').join(', ')}. Não é possível pedir transporte até regularizar.</div>`;
+  h+=`<div style="margin-top:16px"><button class="btn full" onclick="formPedido()">＋ Pedir transporte</button></div>`;
+  h+=`<h2>Próximos pedidos <span class="n">${ped.filter(p=>p.estado!=='cancelado').length}</span></h2>`;
+  if(!ped.length)h+=`<div class="card empty">Ainda não tem pedidos.<br>Toque em «Pedir transporte».</div>`;
+  let ld='';
+  ped.forEach(p=>{
+    const a=atl(p.atletaId),tp=job(p).tipo;
+    if(p.data!==ld){h+=`<div class="mut b" style="margin:12px 2px 6px">${p.data===hoje()?'Hoje · ':''}${fmtD(p.data)}</div>`;ld=p.data}
+    const podeCanc=(p.estado==='pendente'||p.estado==='confirmado')&&(p.data>hoje()||agoraHM()<p.hora);
+    h+=`<div class="card"><div class="row"><div class="hora">${esc(p.hora)}</div><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</div><div class="mut sm">${tp==='reg'?'Sai às '+esc(p.hora):'Tem de chegar às '+esc(p.hora)}</div></div></div>
+    <div class="row" style="margin-top:8px"><div class="grow">${estChip(p)}</div>${podeCanc?`<button class="btn red sm" onclick="cancelar('${p.id}')">Não precisa</button>`:''}</div>
+    ${p.estado==='recusado'&&p.motivo?`<div class="mut" style="margin-top:6px">${esc(p.motivo)}</div>`:''}</div>`;
+  });
+  h+=`<h2>Mensalidades · ${fmtM(m)}</h2><div class="card">`;
+  meus.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${a.socio?'Sócio':'Não sócio'} · ${valor(a)} €/mês</div></div>${pg?`<span class="chip c-v">Pago</span>`:atraso(a)?`<span class="chip c-r">Em atraso</span>`:`<span class="chip c-a">Por pagar · até dia ${S.cfg.diaLimite}</span>`}</div>`});
+  h+=`<div class="mut" style="margin-top:8px;font-size:13px">Pagamento em numerário ou MB Way, junto do clube.</div></div>`;
+  h+=`<p class="mut" style="text-align:center;font-size:13px;margin-top:18px">Pedidos para o próprio dia até às ${esc(S.cfg.prazo)}.<br>As horas de recolha são estimativas.</p></div>`;
+  app.innerHTML=h;
+}
+function cancelar(id){confirma('Cancelar este transporte?',async()=>{const p=S.pedidos.find(x=>x.id===id);p.estado='cancelado';render();
+  await db(sb.from('pedidos').update({estado:'cancelado'}).eq('id',id));toast('Transporte cancelado')},'Sim, cancelar',true)}
+/* Formulário de pedido */
+function formPedido(dataPre){
+  const admin=me().role==='admin';
+  const lista=admin?S.atletas.filter(a=>a.transporte&&usr(a.encId).estado==='ativo'):S.atletas.filter(a=>a.encId===me().id&&a.transporte);
+  const casa=admin?'Casa (morada do atleta)':'Casa ('+(me().freg||'morada registada')+')';
+  const locs=`<option value="${CASA}">${esc(casa)}</option>`+S.cfg.locais.map(l=>`<option>${esc(l.nome)}</option>`).join('')+'<option value="__o">Outro local…</option>';
+  const dataDef=dataPre||(admin||prazoOk(hoje())?hoje():addDias(hoje(),1));
+  let h=`<h3>${admin?'Registar pedido':'Pedir transporte'}</h3>`;
+  if(!admin)h+=`<div class="mut">Para o próprio dia, até às ${esc(S.cfg.prazo)}.</div>`;
+  h+=`<label class="f">Quem vai?</label>`;
+  if(admin)h+=`<input type="text" id="fq" placeholder="Procurar atleta ou encarregado…" oninput="filtraAt()" style="margin-bottom:8px">`;
+  h+=`<div id="fat">`+lista.map(a=>{const at=atraso(a);const dis=!admin&&at;return `<label class="chk ${dis?'dis':''}" data-s="${esc((a.nome+' '+usr(a.encId).nome).toLowerCase())}"><input type="checkbox" value="${a.id}" ${dis?'disabled':''} ${!admin&&lista.length===1&&!dis?'checked':''} onchange="this.parentNode.classList.toggle('on',this.checked)"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${esc(a.escalao)}${admin?' · '+esc(usr(a.encId).nome)+' · '+esc(usr(a.encId).freg||'?'):''}${at?` · <span style="color:var(--vm)">mensalidade em atraso</span>`:''}</div></div></label>`}).join('')+`</div>`;
+  h+=`<label class="f">De onde</label><select id="fo" onchange="outro(this,'foo');lblHora()">${locs}</select><input type="text" id="foo" placeholder="Local e freguesia" style="display:none;margin-top:6px">
+  <label class="f">Para onde</label><select id="fde" onchange="outro(this,'fdeo');lblHora()">${locs}</select><input type="text" id="fdeo" placeholder="Local e freguesia" style="display:none;margin-top:6px">
+  <div class="two"><div><label class="f">Dia</label><input type="date" id="fd" value="${dataDef}" min="${admin?'':hoje()}"></div><div><label class="f" id="fhl">Tem de chegar às</label><input type="time" id="fh" value="17:00"></div></div>
+  <label class="chk" style="margin-top:12px"><input type="checkbox" id="fr" onchange="frw.style.display=this.checked?'block':'none'"><div class="grow b">Também preciso de regresso</div></label>
+  <div id="frw" style="display:none"><label class="f">O treino/jogo acaba às</label><input type="time" id="frh" value="18:30"><div class="mut" style="margin-top:4px">O regresso é feito do destino para o ponto de partida.</div></div>
+  <label class="f">Observações (opcional)</label><input type="text" id="fob" placeholder="Ex.: sai mais cedo da escola">
+  <div class="err" id="fe"></div>
+  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" onclick="gravaPedido()">Enviar pedido</button></div>`;
+  sheet(h);
+  fo.value=CASA;fde.value=S.cfg.locais[0]?S.cfg.locais[0].nome:CASA;lblHora();
+}
+function lblHora(){const b=n=>{const l=S.cfg.locais.find(x=>x.nome===n);return l&&l.base};fhl.textContent=b(fo.value)&&!b(fde.value)?'Treino/jogo acaba às':'Tem de chegar às'}
+function filtraAt(){const q=fq.value.toLowerCase();document.querySelectorAll('#fat .chk').forEach(l=>l.style.display=l.dataset.s.includes(q)?'':'none')}
+function outro(sel,id){document.getElementById(id).style.display=sel.value==='__o'?'block':'none'}
+async function gravaPedido(){
+  const admin=me().role==='admin';
+  const ats=[...document.querySelectorAll('#fat input:checked')].map(i=>i.value);
+  const d=fd.value,hh=fh.value;
+  const o=fo.value==='__o'?foo.value.trim():fo.value,de=fde.value==='__o'?fdeo.value.trim():fde.value;
+  const err=t=>fe.textContent=t;
+  if(!ats.length)return err('Escolha pelo menos um atleta.');
+  if(!d||!hh)return err('Indique o dia e a hora.');
+  if(!o||!de)return err('Indique de onde e para onde.');
+  if(o===de)return err('A partida e o destino são iguais.');
+  if(!admin&&!prazoOk(d))return err(d<hoje()?'Não é possível pedir para dias passados.':`O prazo para hoje terminou às ${S.cfg.prazo}. Contacte o clube.`);
+  if(fr.checked&&(!frh.value||frh.value<=hh))return err('A hora do regresso tem de ser depois da ida.');
+  let n=0,dup=0;
+  const cria=(aid,hora,or,ds)=>{
+    if(S.pedidos.some(p=>p.atletaId===aid&&p.data===d&&p.hora===hora&&p.estado!=='cancelado')){dup++;return}
+    S.pedidos.push({id:uid(),atletaId:aid,data:d,hora,origem:or,destino:ds,obs:fob.value.trim(),estado:'pendente',viagemId:null,porAdmin:admin});n++;
+  };
+  ats.forEach(aid=>{cria(aid,hh,o,de);if(fr.checked)cria(aid,frh.value,de,o)});
+  const novos=S.pedidos.slice(S.pedidos.length-n);
+  fecha();if(admin)diaSel=d;render();
+  if(n){const r=await sb.from('pedidos').insert(novos.map(p=>linha('pedidos',p)));
+    if(r.error){S.pedidos=S.pedidos.filter(p=>!novos.includes(p));render();toast(r.error.message.replace(/^.*?:\s*/,''));return}}
+  toast(n?`${n} pedido${n>1?'s':''} registado${n>1?'s':''}`+(dup?` (${dup} já existia${dup>1?'m':''})`:''):'Esse pedido já existia');
+}
+
+/* ===================== ADMIN ===================== */
+let tab='dia',diaSel=hoje(),selP=new Set(),mesSel=mesAtual(),filtM='todos',qU='',ultPlano=null;
+function vAdmin(){
+  const tabs=[['dia','🗓 Dia'],['mens','💶 Mensalidades'],['users','👥 Utilizadores'],['cfg','⚙️']];
+  let h=topo('Administração')+`<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';selP.clear();render()">${l}</button>`).join('')}</div></nav><div class="wrap">`;
+  h+=({dia:aDia,mens:aMens,users:aUsers,cfg:aCfg})[tab]();
+  app.innerHTML=h+'</div>'+(tab==='dia'&&selP.size?`<div class="fab"><div class="in"><div class="grow b">${selP.size} selecionado${selP.size>1?'s':''}</div><button class="btn gh sm" onclick="selP.clear();render()">Limpar</button><button class="btn" onclick="atribuir()">Atribuir →</button></div></div>`:'');
+}
+/* ---- DIA ---- */
+function aDia(){
+  const ps=S.pedidos.filter(p=>p.data===diaSel);
+  const pend=ps.filter(p=>p.estado==='pendente').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const vs=S.viagens.filter(v=>v.data===diaSel).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const conf=ps.filter(p=>p.estado==='confirmado').length;
+  const rs=vs.map(v=>({v,r:rotaViagem(v)}));
+  const kmDia=rs.reduce((s,x)=>s+(x.r?x.r.km:0),0);
+  /* sobreposições entre viagens (só há uma carrinha) */
+  const sobre=[];for(let i=1;i<rs.length;i++){const a=rs[i-1].r,b=rs[i].r;if(a&&b&&b.inicio<a.fim-0.5)sobre.push(`A viagem das ${rs[i].v.hora} começa antes de a carrinha voltar da viagem das ${rs[i-1].v.hora} (≈${hm(a.fim)}).`)}
+  let h=`<div class="datenav"><button onclick="diaSel=addDias(diaSel,-1);selP.clear();render()">‹</button><div class="d">${diaSel===hoje()?'Hoje · ':diaSel===addDias(hoje(),1)?'Amanhã · ':''}${fmtD(diaSel)}<input type="date" value="${diaSel}" onchange="diaSel=this.value||hoje();selP.clear();render()" style="display:block;margin:4px auto 0;width:auto;padding:4px 8px;font-size:13px;border-width:1px"></div><button onclick="diaSel=addDias(diaSel,1);selP.clear();render()">›</button></div>
+  <div class="stats"><div class="stat"><b style="color:${pend.length?'var(--am)':'inherit'}">${pend.length}</b><span>por atribuir</span></div><div class="stat"><b>${vs.length}</b><span>viagens · ${kmDia} km</span></div><div class="stat"><b>${conf}</b><span>confirmados</span></div></div>`;
+  if(pend.length)h+=`<button class="btn mag full" style="margin-top:12px" onclick="sugerir()">✨ Sugerir viagens otimizadas (${pend.length} pedidos)</button>`;
+  h+=`<div class="acts"><button class="btn sec sm grow" onclick="formPedido(diaSel)">＋ Registar pedido</button><button class="btn sec sm grow" onclick="novaViagem()">＋ Viagem</button><button class="btn sm grow" onclick="partilha()" ${vs.length?'':'disabled'}>Partilhar plano</button></div>`;
+  sobre.forEach(t=>h+=`<div class="warn">⚠️ ${esc(t)}</div>`);
+  h+=`<h2>Por atribuir <span class="n">${pend.length}</span></h2>`;
+  if(!pend.length)h+=`<div class="card empty">Sem pedidos pendentes neste dia ✓</div>`;
+  else h+=`<div class="mut" style="margin:-2px 2px 8px;font-size:13.5px">Use «Sugerir viagens» ou toque nos pedidos para atribuir à mão.</div>`;
+  pend.forEach(p=>{
+    const a=atl(p.atletaId),u=usr(a.encId),at=atraso(a),j=job(p);
+    const fz=j.tipo==='reg'?j.d.freg:j.o.freg;
+    h+=`<div class="card ${selP.has(p.id)?'sel':''}" onclick="togP('${p.id}')" style="cursor:pointer"><div class="row"><div class="hora">${esc(p.hora)}</div><div class="grow"><div class="b">${esc(a.nome)} <span class="mut" style="font-weight:400">· ${esc(a.escalao)}</span></div><div class="mut">${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</div>
+    <div class="mut sm">${j.tipo==='reg'?'Regresso · sai às':'Ida · chegar às'} ${esc(p.hora)} · <b>${esc(fz)}</b>${(j.o.semFreg||j.d.semFreg)?' <span style="color:var(--vm)">(freguesia desconhecida)</span>':''}</div>
+    ${p.obs?`<div class="mut">📝 ${esc(p.obs)}</div>`:''}<div class="mut sm">${esc(u.nome)} · ${esc(u.tel)}</div></div><input type="checkbox" ${selP.has(p.id)?'checked':''} style="width:22px;height:22px;accent-color:var(--v);pointer-events:none"></div>
+    ${at?`<div style="margin-top:6px"><span class="chip c-r">Mensalidade de ${fmtM(at)} em falta</span></div>`:''}
+    <div class="acts" onclick="event.stopPropagation()"><button class="btn red sm" onclick="recusar('${p.id}')">Sem lugar</button></div></div>`;
+  });
+  h+=`<h2>Viagens <span class="n">${vs.length}</span></h2>`;
+  if(!vs.length)h+=`<div class="card empty">Ainda não há viagens neste dia.</div>`;
+  rs.forEach(({v,r})=>{
+    const n=ocup(v),L=S.cfg.lugares;
+    const canc=S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='cancelado');
+    if(r)avalia(r);
+    h+=`<div class="card"><div class="row"><div class="hora">${esc(v.hora)}</div><div class="grow"><div class="b">${r?(r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'):'<span class="mut">Sem passageiros</span>'}</div><div class="mut sm">saída da Horta${r?' · '+r.km+' km · volta ≈'+hm(r.fim):''}${v.nota?' · '+esc(v.nota):''}</div></div><span class="chip ${n>=L?'c-r':'c-v'}">${n}/${L}</span></div>
+    <div class="bar ${n>=L?'full':''}"><i style="width:${Math.min(100,n/L*100)}%"></i></div>`;
+    if(r){h+=htmlRota(r);r.avisos.forEach(a=>h+=`<div class="warn" style="padding:6px 10px">${esc(a)}</div>`)}
+    canc.forEach(p=>h+=`<div class="pax x"><div class="grow"><b>${esc(atl(p.atletaId).nome)}</b> <span class="chip c-r" style="text-decoration:none">cancelou</span></div></div>`);
+    const pax=S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='confirmado');
+    if(pax.length)h+=`<details style="margin-top:6px"><summary class="mut sm" style="cursor:pointer">Retirar atletas</summary>${pax.map(p=>`<div class="pax"><div class="grow">${esc(atl(p.atletaId).nome)} <span class="mut sm">${esc(p.hora)}</span></div><button class="btn gh sm" onclick="tirar('${p.id}')">✕</button></div>`).join('')}</details>`;
+    h+=`<div class="acts"><button class="btn gh sm" onclick="editViagem('${v.id}')">Alterar hora/nota</button><button class="btn red sm" onclick="apagaViagem('${v.id}')">Apagar viagem</button></div></div>`;
+  });
+  const rec=ps.filter(p=>p.estado==='recusado'),canc=ps.filter(p=>p.estado==='cancelado'&&!p.viagemId);
+  if(rec.length||canc.length){h+=`<h2>Recusados / cancelados</h2><div class="card">`;
+    [...rec,...canc].forEach(p=>{const a=atl(p.atletaId);h+=`<div class="pax"><div class="grow"><b>${esc(a.nome)}</b> · ${esc(p.hora)}<div class="mut">${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</div></div>${estChip(p)}${p.estado==='recusado'?`<button class="btn gh sm" onclick="repor('${p.id}')">Repor</button>`:''}</div>`});h+='</div>'}
+  return h;
+}
+/* ---- SUGESTÃO OTIMIZADA ---- */
+function sugerir(){
+  const res=otimizar(diaSel);ultPlano=res;
+  const kmO=res.plano.reduce((s,r)=>s+r.km,0);
+  let h=`<h3>✨ Plano sugerido · ${fmtD(diaSel)}</h3>
+  <div class="mut">${res.nPend} pedidos → <b>${res.plano.length} viagens · ${kmO} km</b>. Sem agrupar por zona seriam ${res.refN} viagens · ${res.refKm} km.</div>`;
+  const dv=res.refN-res.plano.length,dk=res.refKm-kmO;
+  if(dv>0||dk>0)h+=`<div class="ok">Poupa ${dv>0?dv+' viage'+(dv===1?'m':'ns')+' e ':''}${dk} km. Já tem em conta que só há uma carrinha.</div>`;
+  res.plano.forEach((r,i)=>{
+    const L=S.cfg.lugares;
+    h+=`<div class="card" style="margin-top:10px"><div class="row"><div class="hora">${hm(r.inicio)}</div><div class="grow"><div class="b">${r.tipo==='reg'?'Regresso a casa':r.tipo==='ida'?'Ida para treino/jogo':'Viagem mista'}</div><div class="mut sm">${r.km} km · volta à Horta ≈${hm(r.fim)}</div></div><span class="chip ${r.jobs.length>=L?'c-r':'c-v'}">${r.jobs.length}/${L}</span></div>${htmlRota(r)}`;
+    r.avisos.forEach(a=>h+=`<div class="warn" style="padding:6px 10px">⚠️ ${esc(a)}</div>`);
+    h+=`</div>`;
+  });
+  if(res.falha.length)h+=`<div class="warn">Não foi possível encaixar: ${res.falha.map(j=>esc(j.nome)).join(', ')}.</div>`;
+  h+=`<div class="mut sm" style="margin-top:8px">Distâncias e horas são estimativas (média de ${S.cfg.vel} km/h, ${S.cfg.paragem} min por paragem). Depois de aplicar pode ajustar tudo à mão.</div>
+  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" onclick="aplicaPlano()">Aplicar ${res.plano.length} viage${res.plano.length===1?'m':'ns'}</button></div>`;
+  sheet(h);
+}
+async function aplicaPlano(){
+  if(!ultPlano)return;
+  const novasV=[],ids=[];
+  ultPlano.plano.forEach(r=>{const v={id:uid(),data:diaSel,hora:hm(r.inicio),nota:''};S.viagens.push(v);novasV.push(v);r.jobs.forEach(j=>{j.p.estado='confirmado';j.p.viagemId=v.id;ids.push(j.p.id)})});
+  ultPlano=null;selP.clear();fecha();render();
+  await db(sb.from('viagens').insert(novasV.map(v=>linha('viagens',v))));
+  for(const v of novasV)await gravaViagemPedidos(v.id);
+  toast('Viagens criadas — os encarregados já veem a hora de recolha');
+}
+/* grava estado/viagem dos pedidos de uma viagem e as horas previstas que os pais veem */
+async function gravaViagemPedidos(vid){
+  const v=S.viagens.find(x=>x.id===vid);if(!v)return;
+  const ps=S.pedidos.filter(p=>p.viagemId===vid&&p.estado==='confirmado');
+  const r=ps.length?rotaViagem(v):null;
+  ps.forEach(p=>{const i=r&&r.info[p.id];p.prevSobe=i?hm(i.sobe):null;p.prevDesce=i?hm(i.desce):null});
+  if(ps.length)await db(sb.from('pedidos').upsert(ps.map(p=>linha('pedidos',p))));
+}
+async function gravaPedidos(ps){if(ps.length)await db(sb.from('pedidos').upsert(ps.map(p=>linha('pedidos',p))))}
+function togP(id){selP.has(id)?selP.delete(id):selP.add(id);render()}
+function atribuir(){
+  const ps=[...selP].map(id=>S.pedidos.find(p=>p.id===id));
+  const vs=S.viagens.filter(v=>v.data===diaSel).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const L=S.cfg.lugares;
+  const js=ps.map(job);
+  /* hora de saída sugerida para uma viagem só com estes pedidos */
+  const r0=rota(js,0),regs=js.filter(j=>j.tipo==='reg');
+  const off=regs.length?Math.max(...regs.map(j=>j.h-r0.info[j.id].sobe)):Math.min(...js.map(j=>j.h-r0.info[j.id].desce));
+  const hSug=hm(Math.max(0,off));
+  let h=`<h3>Atribuir ${ps.length} atleta${ps.length>1?'s':''}</h3><div class="mut">${ps.map(p=>esc(atl(p.atletaId).nome.split(' ')[0])+' ('+p.hora+')').join(', ')}</div>`;
+  h+=`<label class="f">Juntar a uma viagem existente</label>`;
+  if(!vs.length)h+=`<div class="mut">Ainda não há viagens neste dia.</div>`;
+  vs.forEach(v=>{const n=ocup(v),liv=L-n,ok=liv>=ps.length;
+    let extra='';if(ok){const atual=rotaViagem(v);const nova=rota([...(atual?atual.jobs:[]),...js],toMin(v.hora));extra=` · +${nova.km-(atual?atual.km:0)} km`}
+    h+=`<button class="chk ${ok?'':'dis'}" style="width:100%;text-align:left" ${ok?`onclick="fazAtrib('${v.id}')"`:''}><div class="hora" style="font-size:17px">${esc(v.hora)}</div><div class="grow"><div class="b">${n}/${L} ocupados</div><div class="mut">${ok?liv+' lugares livres'+extra:'Só '+liv+' lugar'+(liv===1?'':'es')+' livre'+(liv===1?'':'s')}</div></div></button>`});
+  h+=`<label class="f">Ou criar nova viagem — saída da Horta</label><div class="row"><input type="time" id="nvh" value="${hSug}" style="flex:1"><button class="btn" onclick="fazAtrib(null)">Criar e atribuir</button></div><div class="mut sm" style="margin-top:4px">Hora sugerida calculada para cumprir os horários pedidos.</div>`;
+  if(ps.length>L)h+=`<div class="warn">Selecionou ${ps.length} atletas e a carrinha só tem ${L} lugares.</div>`;
+  h+=`<div class="acts"><button class="btn gh full" onclick="fecha()">Cancelar</button></div>`;
+  sheet(h);
+}
+async function fazAtrib(vid){
+  const ps=[...selP].map(id=>S.pedidos.find(p=>p.id===id));
+  let nova=null;
+  if(!vid){if(ps.length>S.cfg.lugares){toast(`Máximo ${S.cfg.lugares} lugares por viagem`);return}nova={id:uid(),data:diaSel,hora:nvh.value||ps[0].hora,nota:''};S.viagens.push(nova);vid=nova.id}
+  ps.forEach(p=>{p.estado='confirmado';p.viagemId=vid});
+  selP.clear();fecha();render();
+  if(nova)await db(sb.from('viagens').insert(linha('viagens',nova)));
+  await gravaViagemPedidos(vid);render();toast('Atribuído');
+}
+function novaViagem(){
+  sheet(`<h3>Nova viagem · ${fmtD(diaSel)}</h3><label class="f">Hora de saída da Horta</label><input type="time" id="nvh2" value="17:30"><label class="f">Nota (opcional)</label><input type="text" id="nvn" placeholder="Ex.: jogo em casa, sub-13"><div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="nvok">Criar</button></div>`);
+  nvok.onclick=async()=>{const v={id:uid(),data:diaSel,hora:nvh2.value||'17:30',nota:nvn.value.trim()};S.viagens.push(v);fecha();render();await db(sb.from('viagens').insert(linha('viagens',v)))};
+}
+function editViagem(id){
+  const v=S.viagens.find(x=>x.id===id);
+  sheet(`<h3>Viagem das ${esc(v.hora)}</h3><label class="f">Hora de saída da Horta</label><input type="time" id="evh" value="${esc(v.hora)}"><label class="f">Nota</label><input type="text" id="evn" value="${esc(v.nota)}"><div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="evok">Guardar</button></div>`);
+  evok.onclick=async()=>{v.hora=evh.value||v.hora;v.nota=evn.value.trim();fecha();render();await db(sb.from('viagens').update({hora:v.hora,nota:v.nota}).eq('id',id));await gravaViagemPedidos(id);render()};
+}
+function apagaViagem(id){confirma('Apagar a viagem? Os atletas voltam para «Por atribuir».',async()=>{const ps=S.pedidos.filter(p=>p.viagemId===id);ps.forEach(p=>{if(p.estado==='confirmado')p.estado='pendente';p.viagemId=null;p.prevSobe=null;p.prevDesce=null});S.viagens=S.viagens.filter(v=>v.id!==id);render();
+  await gravaPedidos(ps);await db(sb.from('viagens').delete().eq('id',id))},'Apagar',true)}
+async function tirar(id){const p=S.pedidos.find(x=>x.id===id);const vid=p.viagemId;p.estado='pendente';p.viagemId=null;p.prevSobe=null;p.prevDesce=null;render();await gravaPedidos([p]);await gravaViagemPedidos(vid);render();toast('Voltou para «Por atribuir»')}
+function recusar(id){
+  sheet(`<h3>Sem lugar para este pedido</h3><label class="f">Mensagem para o encarregado (opcional)</label><input type="text" id="rm" placeholder="Ex.: carrinha cheia às 17h30"><div class="acts"><button class="btn gh grow" onclick="fecha()">Voltar</button><button class="btn red grow" id="rok">Marcar sem lugar</button></div>`);
+  rok.onclick=async()=>{const p=S.pedidos.find(x=>x.id===id);p.estado='recusado';p.motivo=rm.value.trim();selP.delete(id);fecha();render();await gravaPedidos([p])};
+}
+async function repor(id){const p=S.pedidos.find(x=>x.id===id);p.estado='pendente';p.motivo='';render();await gravaPedidos([p])}
+function partilha(){
+  const vs=S.viagens.filter(v=>v.data===diaSel).sort((a,b)=>a.hora.localeCompare(b.hora));
+  let t=`🚐 Transportes FSC — ${fmtD(diaSel)}\n`;
+  vs.forEach(v=>{const r=rotaViagem(v);if(!r)return;t+=`\n▶ Saída ${v.hora} (${r.jobs.length}/${S.cfg.lugares})${v.nota?' · '+v.nota:''}\n`;
+    r.stops.forEach(s=>{const n=[...s.sobe.map(j=>'↑'+j.nome.split(' ')[0]),...s.desce.map(j=>'↓'+j.nome.split(' ')[0])].join(' ');t+=`${hm(s.t)} ${s.label}${s.morada?' ('+s.morada+')':''} · ${s.freg} — ${n}\n`})});
+  const pend=S.pedidos.filter(p=>p.data===diaSel&&p.estado==='pendente').length;
+  sheet(`<h3>Plano do dia</h3><div class="mut">Para enviar ao motorista. ↑ entra · ↓ sai</div>${pend?`<div class="warn">Ainda há ${pend} pedido${pend>1?'s':''} por atribuir.</div>`:''}<pre class="msg">${esc(t.trim())}</pre>
+  <div class="acts"><button class="btn grow" id="pcp">Copiar</button><a class="btn sec grow" style="text-align:center;text-decoration:none" href="https://wa.me/?text=${encodeURIComponent(t.trim())}" target="_blank" rel="noopener">Abrir no WhatsApp</a></div><div class="acts"><button class="btn gh full" onclick="fecha()">Fechar</button></div>`);
+  pcp.onclick=()=>copiar(t.trim());
+}
+/* ---- MENSALIDADES ---- */
+function aMens(){
+  const m=mesSel;
+  const ats=S.atletas.filter(a=>a.transporte&&a.inicio<=m);
+  let esp=0,rec=0;ats.forEach(a=>{esp+=valor(a);if(pago(a.id,m))rec+=valor(a)});
+  const nf=ats.filter(a=>!pago(a.id,m)).length;
+  let h=`<div class="datenav"><button onclick="mesSel=addMes(mesSel,-1);render()">‹</button><div class="d" style="text-transform:capitalize">${fmtM(m)}</div><button onclick="mesSel=addMes(mesSel,1);render()">›</button></div>
+  <div class="stats"><div class="stat"><b>${esp} €</b><span>esperado</span></div><div class="stat"><b style="color:var(--v)">${rec} €</b><span>recebido</span></div><div class="stat"><b style="color:${nf?'var(--vm)':'inherit'}">${esp-rec} €</b><span>em falta (${nf})</span></div></div>
+  <div class="filt">${[['todos','Todos'],['falta','Por pagar'],['pagos','Pagos']].map(([k,l])=>`<button class="${filtM===k?'on':''}" onclick="filtM='${k}';render()">${l}</button>`).join('')}</div>`;
+  let any=false;
+  S.users.filter(u=>u.role==='enc').forEach(u=>{
+    let la=ats.filter(a=>a.encId===u.id);
+    if(filtM==='falta')la=la.filter(a=>!pago(a.id,m));if(filtM==='pagos')la=la.filter(a=>pago(a.id,m));
+    if(!la.length)return;any=true;
+    h+=`<div class="card"><div class="row"><div class="grow b">${esc(u.nome)}</div>${u.estado==='suspenso'?'<span class="chip c-g">suspenso</span>':''}<span class="mut">${esc(u.tel)}</span></div>`;
+    la.forEach(a=>{const pg=pago(a.id,m);h+=`<div class="pax"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${a.socio?'Sócio':'Não sócio'} · ${valor(a)} €</div></div>`+
+      (pg?`<span class="chip c-v">✓ ${pg.metodo==='mbway'?'MB Way':'Dinheiro'} · ${pg.data.slice(8,10)}/${pg.data.slice(5,7)}</span><button class="btn gh sm" onclick="anulaPag('${a.id}')" title="Anular">↺</button>`
+      :`<button class="btn sm" onclick="paga('${a.id}','dinheiro')">💶 Dinheiro</button><button class="btn sm" style="background:var(--az)" onclick="paga('${a.id}','mbway')">MB Way</button>`)+`</div>`});
+    h+=`</div>`;
+  });
+  if(!any)h+=`<div class="card empty">Nada a mostrar.</div>`;
+  return h;
+}
+async function paga(aid,met){const pg={atletaId:aid,mes:mesSel,metodo:met,data:hoje()};S.pags.push(pg);render();await db(sb.from('pagamentos').insert(linha('pagamentos',pg)));toast('Pagamento registado')}
+function anulaPag(aid){confirma('Anular este pagamento?',async()=>{S.pags=S.pags.filter(p=>!(p.atletaId===aid&&p.mes===mesSel));render();await db(sb.from('pagamentos').delete().eq('atleta_id',aid).eq('mes',mesSel))},'Anular',true)}
+/* ---- UTILIZADORES ---- */
+function aUsers(){
+  const encs=S.users.filter(u=>u.role==='enc'&&(u.nome+' '+u.tel+' '+u.username+' '+(u.freg||'')+' '+S.atletas.filter(a=>a.encId===u.id).map(a=>a.nome).join(' ')).toLowerCase().includes(qU.toLowerCase())).sort((a,b)=>(a.estado>b.estado?1:a.estado<b.estado?-1:0)||a.nome.localeCompare(b.nome));
+  let h=`<div style="margin-top:14px" class="row"><input type="text" placeholder="Procurar nome, atleta, freguesia…" value="${esc(qU)}" oninput="qU=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const i=document.querySelector('.wrap input');i.focus();i.setSelectionRange(99,99)},250)" style="flex:1"><button class="btn" onclick="formUser()">＋ Novo</button></div>`;
+  h+=`<h2>Encarregados <span class="n">${encs.length}</span></h2>`;
+  encs.forEach(u=>{
+    const as=S.atletas.filter(a=>a.encId===u.id),sus=u.estado==='suspenso';
+    h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)} · <b>${esc(u.freg||'sem freguesia')}</b>${u.morada?' · '+esc(u.morada):''}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
+    ${!u.freg?'<div class="warn" style="padding:6px 10px">Sem freguesia — o otimizador assume a Horta.</div>':''}
+    <div style="margin-top:6px">${as.map(a=>`<span class="chip ${a.transporte?'c-b':'c-g'}" style="margin:2px 4px 2px 0">${esc(a.nome.split(' ')[0])} · ${a.socio?'sócio':'não sócio'}${atraso(a)?' · ⚠️':''}</span>`).join('')}</div>
+    <div class="acts"><button class="btn gh sm" onclick="formUser('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`;
+  });
+  if(!encs.length)h+=`<div class="card empty">Nenhum resultado.</div>`;
+  return h;
+}
+function estadoU(id,e){
+  const u=usr(id);
+  const faz=async()=>{try{await fn({acao:'estado',id,estado:e})}catch(x){toast(x.message);return}
+    u.estado=e;
+    if(e==='suspenso'){const ids=S.atletas.filter(a=>a.encId===id).map(a=>a.id);const ps=S.pedidos.filter(p=>ids.includes(p.atletaId)&&p.data>=hoje()&&p.estado==='pendente');ps.forEach(p=>p.estado='cancelado');await gravaPedidos(ps)}
+    render();toast(e==='suspenso'?'Utilizador suspenso':'Utilizador reativado')};
+  if(e==='suspenso')confirma(`Suspender ${u.nome}? Deixa de conseguir entrar e os pedidos futuros pendentes são cancelados.`,faz,'Suspender',true);
+  else faz();
+}
+function credMsg(u,pass){return `Olá ${u.nome.split(' ')[0]}! Já pode pedir os transportes do Fayal Sport Club em:\n${location.origin+location.pathname}\n\nUtilizador: ${u.username}\nPalavra-passe: ${pass}\n\nNo telemóvel, use «Adicionar ao ecrã principal» para ficar com a aplicação.\nPedidos para o próprio dia até às ${S.cfg.prazo}.`}
+function mostraCred(u,tit,pass){
+  const t=credMsg(u,pass),tel=u.tel.replace(/\D/g,'');
+  sheet(`<h3>${tit}</h3><div class="mut">A palavra-passe só aparece agora. Envie-a já ao encarregado.</div><pre class="msg">${esc(t)}</pre><div class="acts"><button class="btn grow" id="ccp">Copiar mensagem</button><a class="btn sec grow" style="text-align:center;text-decoration:none" href="https://wa.me/${tel.length===9?'351'+tel:tel}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">Enviar por WhatsApp</a></div><div class="acts"><button class="btn gh full" onclick="fecha()">Fechar</button></div>`);
+  ccp.onclick=()=>copiar(t);
+}
+function novaPass(id){const u=usr(id);confirma(`Gerar nova palavra-passe para ${u.nome}? A antiga deixa de funcionar.`,async()=>{const p=genPass();try{await fn({acao:'password',id,password:p})}catch(x){toast(x.message);return}mostraCred(u,'Nova palavra-passe',p)},'Gerar')}
+let fAt=[];
+function formUser(id){
+  const u=id?usr(id):null;
+  fAt=u?S.atletas.filter(a=>a.encId===u.id).map(a=>({...a})):[{id:uid(),nome:'',escalao:'',socio:false,transporte:true,inicio:mesAtual()}];
+  sheet(`<h3>${u?'Editar encarregado':'Novo encarregado'}</h3>
+  <label class="f">Nome do encarregado</label><input type="text" id="un" value="${esc(u?u.nome:'')}" ${u?'':'oninput="if(!uu._m)uu.value=sugUser(this.value)"'}>
+  <div class="two"><div><label class="f">Telemóvel</label><input type="tel" id="ut" value="${esc(u?u.tel:'')}"></div><div><label class="f">Utilizador</label><input type="text" id="uu" autocapitalize="none" value="${esc(u?u.username:'')}" oninput="this._m=1"></div></div>
+  <div class="two"><div><label class="f">Freguesia</label><select id="uf"><option value="">— escolher —</option>${fregOpts(u?u.freg:'')}</select></div><div><label class="f">Morada / lugar</label><input type="text" id="um" value="${esc(u?u.morada:'')}" placeholder="Ex.: Canada do Pilar, 12"></div></div>
+  <label class="f">Atletas</label><div id="uat"></div><button class="btn gh sm" onclick="lerAt();fAt.push({id:uid(),nome:'',escalao:'',socio:false,transporte:true,inicio:mesAtual()});desAt()">＋ Adicionar atleta</button>
+  <datalist id="esc">${['Traquinas (fut.)','Benjamins (fut.)','Infantis (fut.)','Iniciados (fut.)','Juvenis (fut.)','Juniores (fut.)','Seniores fem. (fut.)','Minis (basq.)','Iniciados (basq.)','Cadetes (basq.)','Juniores (basq.)','Infantis (vol.)','Iniciados (vol.)','Cadetes (vol.)','Juvenis (vol.)'].map(x=>`<option value="${x}">`).join('')}</datalist>
+  <div class="err" id="ue"></div>
+  <div class="acts"><button class="btn gh grow" onclick="fecha()">Cancelar</button><button class="btn grow" id="ugb" onclick="gravaUser('${id||''}')">${u?'Guardar':'Criar e gerar acesso'}</button></div>`);
+  desAt();
+}
+function sugUser(n){const p=n.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(Boolean);if(!p.length)return'';let b=p[0]+(p.length>1?'.'+p[p.length-1]:''),s=b,i=2;while(S.users.some(u=>u.username===s))s=b+i++;return s}
+function desAt(){uat.innerHTML=fAt.map((a,i)=>`<div class="card" style="padding:10px;margin-bottom:8px"><div class="atl"><input type="text" placeholder="Nome do atleta" value="${esc(a.nome)}" data-i="${i}" data-k="nome"><input type="text" list="esc" placeholder="Escalão" value="${esc(a.escalao)}" data-i="${i}" data-k="escalao"><button class="btn gh sm" onclick="lerAt();fAt.splice(${i},1);desAt()">✕</button></div>
+  <div class="row" style="gap:16px"><label class="sw"><input type="checkbox" data-i="${i}" data-k="socio" ${a.socio?'checked':''}> Sócio (${S.cfg.vSocio} €)</label><label class="sw"><input type="checkbox" data-i="${i}" data-k="transporte" ${a.transporte?'checked':''}> Usa transporte</label></div></div>`).join('')||'<div class="mut" style="margin-bottom:8px">Sem atletas.</div>'}
+function lerAt(){document.querySelectorAll('#uat [data-k]').forEach(e=>{const a=fAt[e.dataset.i];a[e.dataset.k]=e.type==='checkbox'?e.checked:e.value.trim()})}
+async function gravaUser(id){
+  lerAt();
+  const nome=un.value.trim(),tel=ut.value.trim(),user=uu.value.trim().toLowerCase(),freg=uf.value;
+  const err=t=>ue.textContent=t;
+  if(!nome)return err('Indique o nome.');
+  if(!/^[a-z0-9._-]{3,40}$/.test(user))return err('Utilizador: só letras minúsculas, números, ponto ou hífen (mín. 3).');
+  if(!freg)return err('Indique a freguesia (é usada para otimizar as viagens).');
+  if(S.users.some(u=>u.username===user&&u.id!==id))return err('Esse utilizador já existe.');
+  const ats=fAt.filter(a=>a.nome);
+  if(!ats.length)return err('Adicione pelo menos um atleta.');
+  if(ats.some(a=>!a.escalao))return err('Indique o escalão de cada atleta.');
+  ugb.disabled=true;err('A gravar…');
+  let u,pass=null;
+  try{
+    if(id){u=usr(id);
+      if(u.username!==user){await fn({acao:'username',id,username:user});u.username=user}
+      Object.assign(u,{nome,tel,freg,morada:um.value.trim()});
+      await db(sb.from('profiles').update(linha('profiles',u)).eq('id',id));
+    }else{
+      pass=genPass();
+      const r=await fn({acao:'criar',username:user,password:pass,nome,tel,freg,morada:um.value.trim()});
+      u={id:r.id,nome,tel,username:user,freg,role:'enc',estado:'ativo',morada:um.value.trim()};S.users.push(u);
+    }
+  }catch(x){ugb.disabled=false;return err(x.message)}
+  const keep=ats.map(a=>a.id);
+  const rem=S.atletas.filter(a=>a.encId===u.id&&!keep.includes(a.id)).map(a=>a.id);
+  S.atletas=S.atletas.filter(a=>a.encId!==u.id||keep.includes(a.id));
+  const linhas=ats.map(a=>{const o={id:a.id,encId:u.id,nome:a.nome,escalao:a.escalao,socio:!!a.socio,transporte:!!a.transporte,inicio:a.inicio||mesAtual()};const ex=S.atletas.find(x=>x.id===a.id);ex?Object.assign(ex,o):S.atletas.push(o);return linha('atletas',o)});
+  await db(sb.from('atletas').upsert(linhas));
+  if(rem.length)await db(sb.from('atletas').delete().in('id',rem));
+  render();
+  if(id){fecha();toast('Guardado')}else mostraCred(u,'Acesso criado',pass);
+}
+/* ---- DEFINIÇÕES ---- */
+let fLoc=null;
+function aCfg(){
+  const c=S.cfg;fLoc=c.locais.map(l=>({...l}));
+  return `<h2>Regras</h2><div class="card">
+  <div class="two"><div><label class="f">Lugares na carrinha</label><input type="number" min="1" id="cl" value="${c.lugares}"></div><div><label class="f">Prazo p/ pedidos do dia</label><input type="time" id="cp" value="${c.prazo}"></div></div>
+  <div class="two"><div><label class="f">Mensalidade sócio (€)</label><input type="number" min="0" id="cs" value="${c.vSocio}"></div><div><label class="f">Não sócio (€)</label><input type="number" min="0" id="cn" value="${c.vNaoSocio}"></div></div>
+  <label class="f">Pagar até ao dia do mês</label><input type="number" min="1" max="28" id="cd" value="${c.diaLimite}"><div class="mut sm" style="margin-top:4px">Depois deste dia, quem não pagou fica impedido de pedir transporte.</div></div>
+  <h2>Otimizador</h2><div class="card">
+  <div class="two"><div><label class="f">Espera máx. no regresso (min)</label><input type="number" min="0" id="ce" value="${c.maxEspera}"></div><div><label class="f">Chegar antes, no máx. (min)</label><input type="number" min="0" id="cc" value="${c.maxCedo}"></div></div>
+  <div class="mut sm" style="margin-top:4px">Ex.: com 30 min, os Iniciados que saem às 18:00 podem esperar pelos Juvenis das 18:30 e seguir na mesma viagem.</div>
+  <div class="two"><div><label class="f">Velocidade média (km/h)</label><input type="number" min="10" id="cv" value="${c.vel}"></div><div><label class="f">Tempo por paragem (min)</label><input type="number" min="0" id="cpa" value="${c.paragem}"></div></div>
+  <label class="f">Desvio máximo para juntar alguém «no caminho» (km)</label><input type="number" min="0" id="cdv" value="${c.desvio}">
+  </div>
+  <h2>Locais habituais</h2><div class="card"><div class="mut sm" style="margin-bottom:8px">Marque «Clube» nas instalações onde se treina/joga (definem o que é ida e regresso).</div><div id="lls"></div><button class="btn gh sm" onclick="lerLoc();fLoc.push({nome:'',freg:S.cfg.base,base:false});desLoc()">＋ Local</button></div>
+  <h2>Distâncias no Faial</h2><div class="card"><div class="mut sm">Km aproximados ao longo da estrada regional, a partir da Horta, no sentido Pedro Miguel → Cedros → Capelo → Feteira. «Desvio» = km fora da estrada principal (ex.: Flamengos). <b>São estimativas — corrija com os valores que conhece.</b></div>
+  <table class="z" style="margin-top:8px"><tr class="mut sm"><td>Freguesia</td><td style="width:70px">km</td><td style="width:70px">desvio</td><td class="mut" style="width:60px">↔ Horta</td></tr>
+  ${c.zonas.map((z,i)=>`<tr><td>${esc(z.nome)}</td><td><input type="number" step="0.5" data-z="${i}" data-k="pos" value="${z.pos}"></td><td><input type="number" step="0.5" data-z="${i}" data-k="ramal" value="${z.ramal}"></td><td class="mut">${km(c.base,z.nome)} km</td></tr>`).join('')}</table>
+  <label class="f">Volta completa à ilha (km)</label><input type="number" id="can" value="${c.anel}"></div>
+  <button class="btn full" style="margin-top:14px" onclick="gravaCfg()">Guardar definições</button>
+  <h2>Administração</h2><div class="card"><div class="mut">Palavra-passe da conta de administração</div><div class="row" style="margin-top:8px"><input type="password" id="apw" placeholder="Nova palavra-passe" style="flex:1"><button class="btn sec" onclick="mudaPassAdmin()">Alterar</button></div></div>`;
+}
+function desLoc(){lls.innerHTML=fLoc.map((l,i)=>`<div class="lrow"><input type="text" data-l="${i}" data-k="nome" value="${esc(l.nome)}" placeholder="Nome"><select data-l="${i}" data-k="freg">${fregOpts(l.freg)}</select><label class="sw"><input type="checkbox" data-l="${i}" data-k="base" ${l.base?'checked':''}>Clube</label><button class="btn gh sm" onclick="lerLoc();fLoc.splice(${i},1);desLoc()">✕</button></div>`).join('')}
+function lerLoc(){document.querySelectorAll('#lls [data-k]').forEach(e=>{fLoc[e.dataset.l][e.dataset.k]=e.type==='checkbox'?e.checked:e.value.trim()})}
+async function mudaPassAdmin(){if(apw.value.length<10)return toast('Mínimo 10 caracteres');const {error}=await sb.auth.updateUser({password:apw.value});apw.value='';toast(error?error.message:'Palavra-passe alterada')}
+async function gravaCfg(){
+  const c=S.cfg;lerLoc();
+  c.lugares=Math.max(1,+cl.value||8);c.prazo=cp.value||'12:00';c.vSocio=+cs.value||0;c.vNaoSocio=+cn.value||0;c.diaLimite=Math.min(28,Math.max(1,+cd.value||10));
+  c.maxEspera=Math.max(0,+ce.value||0);c.maxCedo=Math.max(0,+cc.value||0);c.vel=Math.max(10,+cv.value||40);c.paragem=Math.max(0,+cpa.value||0);c.desvio=Math.max(0,+cdv.value||0);
+  c.anel=Math.max(10,+can.value||52);
+  document.querySelectorAll('[data-z]').forEach(e=>{c.zonas[e.dataset.z][e.dataset.k]=+e.value||0});
+  c.locais=fLoc.filter(l=>l.nome);
+  render();await db(sb.from('config').update({dados:c}).eq('id',1));toast('Definições guardadas');
+}
+
+/* ===================== ROUTER ===================== */
+function render(){
+  const u=me();
+  if(!sess||!u||u.estado==='suspenso'||!S.cfg)return vLogin();
+  u.role==='admin'?vAdmin():vEnc();
+  if(tab==='cfg'&&u.role==='admin'&&document.getElementById('lls'))desLoc();
+}
+(async()=>{app.innerHTML='<div class="empty" style="margin-top:30vh">A carregar…</div>';await carrega();render()})();
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&sess&&!document.getElementById('ov').classList.contains('on')){await carrega();render()}});
+</script>
+</body>
+</html>

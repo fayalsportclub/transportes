@@ -1,0 +1,34 @@
+name: Manter ativo
+
+# O Supabase gratuito pausa projetos sem atividade durante 7 dias.
+# Esta tarefa faz um pedido à base de dados de 3 em 3 dias e, uma vez por mês,
+# grava uma pequena alteração para o GitHub não desligar as tarefas agendadas.
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pedido à base de dados
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          KEY=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/api-keys?reveal=true" | jq -r '([.[]|select(.name=="anon")][0].api_key) // ([.[]|select(.type=="publishable")][0].api_key)')
+          curl -sf -X POST "https://$REF.supabase.co/rest/v1/rpc/ping" -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}'
+          echo
+      - name: Atividade mensal no repositório
+        run: |
+          ULT=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - ULT )) -gt 2419200 ]; then
+            date -u +%FT%TZ > keepalive.txt
+            git config user.name "Transportes FSC"; git config user.email "actions@users.noreply.github.com"
+            git add keepalive.txt && git commit -m "Manter ativo" && git push
+          fi
