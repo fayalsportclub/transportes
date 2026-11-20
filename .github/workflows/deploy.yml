@@ -42,8 +42,8 @@ jobs:
 
       - name: Base de dados (migrações)
         run: |
-          supabase link --project-ref "$REF" -p "$SUPABASE_DB_PASSWORD"
-          supabase db push -p "$SUPABASE_DB_PASSWORD" --include-all
+          supabase link --project-ref "$REF"
+          supabase db push --linked --include-all --yes
 
       - name: Função de administração
         run: supabase functions deploy admin --project-ref "$REF" --no-verify-jwt --use-api
