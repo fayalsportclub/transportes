@@ -473,12 +473,18 @@ function aDia(){
   const sobre=[];for(let i=1;i<rs.length;i++){const a=rs[i-1].r,b=rs[i].r;if(a&&b&&b.inicio<a.fim-0.5)sobre.push(`A viagem das ${rs[i].v.hora} começa antes de a carrinha voltar da viagem das ${rs[i-1].v.hora} (≈${hm(a.fim)}).`)}
   let h=`<div class="datenav"><button onclick="diaSel=addDias(diaSel,-1);selP.clear();render()">‹</button><div class="d">${diaSel===hoje()?'Hoje · ':diaSel===addDias(hoje(),1)?'Amanhã · ':''}${fmtD(diaSel)}<input type="date" value="${diaSel}" onchange="diaSel=this.value||hoje();selP.clear();render()" style="display:block;margin:4px auto 0;width:auto;padding:4px 8px;font-size:13px;border-width:1px"></div><button onclick="diaSel=addDias(diaSel,1);selP.clear();render()">›</button></div>
   <div class="stats"><div class="stat"><b style="color:${pend.length?'var(--am)':'inherit'}">${pend.length}</b><span>por atribuir</span></div><div class="stat"><b>${vs.length}</b><span>viagens · ${kmDia} min</span></div><div class="stat"><b>${conf}</b><span>confirmados</span></div></div>`;
-  if(pend.length)h+=`<button class="btn mag full" style="margin-top:12px" onclick="sugerir()">✨ Sugerir viagens otimizadas (${pend.length} pedidos)</button>`;
+  if(pend.length){let res=null,erro='';try{res=otimizar(diaSel);ultPlano=res}catch(e){console.error(e);erro=e.message}
+    if(erro)h+=`<div class="warn">Não foi possível calcular a sugestão automática: ${esc(erro)}</div>`;
+    else if(res&&res.plano.length){const kmO=res.plano.reduce((s,r)=>s+r.km,0);
+      h+=`<div class="card" style="margin-top:12px;border:2px solid var(--v2);background:var(--vc)"><div class="b">✨ Sugestão automática para os ${res.nPend} pedidos por atribuir</div>
+      <div style="margin-top:6px">${res.plano.map(r=>`<div class="st"><span class="t">${hm(r.inicio)}</span><span class="w">${r.tipo==='reg'?'Regresso':r.tipo==='ida'?'Ida':'Mista'} · ${r.jobs.length} atleta${r.jobs.length>1?'s':''} · ${[...new Set(r.stops.map(s=>s.freg).filter(f=>!/^Horta/.test(f)))].join(', ')||'Horta'}${r.avisos.length?' <span style="color:var(--am)">⚠️</span>':''}</span></div>`).join('')}</div>
+      <div class="mut sm">${res.plano.length} viage${res.plano.length>1?'ns':'m'} · ${kmO} min ao volante${res.falha.length?' · '+res.falha.length+' por encaixar':''}</div>
+      <div class="acts"><button class="btn sec sm grow" onclick="sugerir()">Ver percursos</button><button class="btn sm grow" onclick="aplicaPlano()">Aplicar sugestão</button></div></div>`}}
   h+=`<div class="acts"><button class="btn sec sm grow" onclick="formPedido(diaSel)">＋ Registar pedido</button><button class="btn sec sm grow" onclick="novaViagem()">＋ Viagem</button><button class="btn sm grow" onclick="partilha()" ${vs.length?'':'disabled'}>Partilhar plano</button></div>`;
   sobre.forEach(t=>h+=`<div class="warn">⚠️ ${esc(t)}</div>`);
   h+=`<h2>Por atribuir <span class="n">${pend.length}</span></h2>`;
   if(!pend.length)h+=`<div class="card empty">Sem pedidos pendentes neste dia ✓</div>`;
-  else h+=`<div class="mut" style="margin:-2px 2px 8px;font-size:13.5px">Use «Sugerir viagens» ou toque nos pedidos para atribuir à mão.</div>`;
+  else h+=`<div class="mut" style="margin:-2px 2px 8px;font-size:13.5px">Aplique a sugestão automática acima ou toque nos pedidos para atribuir à mão.</div>`;
   pend.forEach(p=>{
     const a=atl(p.atletaId),u=usr(a.encId),at=atraso(a),j=job(p);
     const fz=j.tipo==='reg'?j.d.freg:j.o.freg;
@@ -500,17 +506,17 @@ function aDia(){
     if(r){h+=htmlRota(r);r.avisos.forEach(a=>h+=`<div class="warn" style="padding:6px 10px">${esc(a)}</div>`)}
     canc.forEach(p=>h+=`<div class="pax x"><div class="grow"><b>${esc(atl(p.atletaId).nome)}</b> <span class="chip c-r" style="text-decoration:none">cancelou</span></div></div>`);
     const pax=S.pedidos.filter(p=>p.viagemId===v.id&&p.estado==='confirmado');
-    if(pax.length)h+=`<details style="margin-top:6px"><summary class="mut sm" style="cursor:pointer">Retirar atletas</summary>${pax.map(p=>`<div class="pax"><div class="grow">${esc(atl(p.atletaId).nome)} <span class="mut sm">${esc(p.hora)}</span></div><button class="btn gh sm" onclick="tirar('${p.id}')">✕</button></div>`).join('')}</details>`;
+    if(pax.length)h+=`<div class="mut sm b" style="margin-top:8px">Atletas nesta viagem</div>${pax.map(p=>`<div class="pax"><div class="grow">${esc(atl(p.atletaId).nome)} <span class="mut sm">${esc(p.hora)} · ${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</span></div><button class="btn gh sm" onclick="tirar('${p.id}')" title="Tirar da viagem e voltar a «Por atribuir»">↩︎ Tirar</button><button class="btn red sm" onclick="cancelaAdm('${p.id}')" title="Cancelar este percurso">✕</button></div>`).join('')}`;
     h+=`<div class="acts"><button class="btn gh sm" onclick="editViagem('${v.id}')">Alterar hora/nota</button><button class="btn red sm" onclick="apagaViagem('${v.id}')">Apagar viagem</button></div></div>`;
   });
   const rec=ps.filter(p=>p.estado==='recusado'),canc=ps.filter(p=>p.estado==='cancelado'&&!p.viagemId);
   if(rec.length||canc.length){h+=`<h2>Recusados / cancelados</h2><div class="card">`;
-    [...rec,...canc].forEach(p=>{const a=atl(p.atletaId);h+=`<div class="pax"><div class="grow"><b>${esc(a.nome)}</b> · ${esc(p.hora)}<div class="mut">${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</div></div>${estChip(p)}${p.estado==='recusado'?`<button class="btn gh sm" onclick="repor('${p.id}')">Repor</button>`:''}</div>`});h+='</div>'}
+    [...rec,...canc].forEach(p=>{const a=atl(p.atletaId);h+=`<div class="pax"><div class="grow"><b>${esc(a.nome)}</b> · ${esc(p.hora)}<div class="mut">${esc(locLabel(p.origem,p.atletaId))} → ${esc(locLabel(p.destino,p.atletaId))}</div></div>${estChip(p)}<button class="btn gh sm" onclick="repor('${p.id}')">Repor</button></div>`});h+='</div>'}
   return h;
 }
 /* ---- SUGESTÃO OTIMIZADA ---- */
 function sugerir(){
-  const res=otimizar(diaSel);ultPlano=res;
+  let res;try{res=otimizar(diaSel)}catch(e){toast('Erro no cálculo: '+e.message);return}ultPlano=res;
   const kmO=res.plano.reduce((s,r)=>s+r.km,0);
   let h=`<h3>✨ Plano sugerido · ${fmtD(diaSel)}</h3>
   <div class="mut">${res.nPend} pedidos → <b>${res.plano.length} viagens · ${kmO} min ao volante</b>. Sem agrupar por zona seriam ${res.refN} viagens · ${res.refKm} min.</div>`;
@@ -591,7 +597,8 @@ function recusar(id){
   sheet(`<h3>Sem lugar para este pedido</h3><label class="f">Mensagem para o encarregado (opcional)</label><input type="text" id="rm" placeholder="Ex.: carrinha cheia às 17h30"><div class="acts"><button class="btn gh grow" onclick="fecha()">Voltar</button><button class="btn red grow" id="rok">Marcar sem lugar</button></div>`);
   rok.onclick=async()=>{const p=S.pedidos.find(x=>x.id===id);p.estado='recusado';p.motivo=rm.value.trim();selP.delete(id);fecha();render();await gravaPedidos([p])};
 }
-async function repor(id){const p=S.pedidos.find(x=>x.id===id);p.estado='pendente';p.motivo='';render();await gravaPedidos([p])}
+function cancelaAdm(id){const p=S.pedidos.find(x=>x.id===id);confirma(`Cancelar o percurso de ${atl(p.atletaId).nome} (${p.hora})? A viagem mantém-se com os restantes atletas.`,async()=>{const vid=p.viagemId;p.estado='cancelado';p.viagemId=null;p.prevSobe=null;p.prevDesce=null;render();await gravaPedidos([p]);await gravaViagemPedidos(vid);render();toast('Percurso cancelado — viagem atualizada')},'Cancelar percurso',true)}
+async function repor(id){const p=S.pedidos.find(x=>x.id===id);p.estado='pendente';p.motivo='';p.viagemId=null;render();await gravaPedidos([p])}
 function partilha(){
   const vs=S.viagens.filter(v=>v.data===diaSel).sort((a,b)=>a.hora.localeCompare(b.hora));
   let t=`🚐 Transportes FSC — ${fmtD(diaSel)}\n`;
