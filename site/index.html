@@ -137,7 +137,7 @@ const camel=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k.replace(/_([
 const pick=(o,ks)=>Object.fromEntries(ks.filter(k=>k in o).map(k=>[k,o[k]]));
 const COL={pedidos:['id','atletaId','data','hora','origem','destino','obs','estado','viagemId','motivo','porAdmin','prevSobe','prevDesce'],
   viagens:['id','data','hora','nota'],atletas:['id','encId','nome','escalao','socio','transporte','inicio','autorizado','isento','decisao'],pagamentos:['atletaId','mes','metodo','data'],
-  profiles:['nome','tel','freg','morada']};
+  profiles:['nome','tel','freg','morada','moradas']};
 const linha=(t,o)=>snake(pick(o,COL[t]));
 /* executa uma escrita; se falhar, avisa e volta a carregar os dados do servidor */
 async function db(q){
@@ -174,7 +174,12 @@ const atl=id=>S.atletas.find(a=>a.id===id);
 const usr=id=>S.users.find(u=>u.id===id);
 const valor=a=>a.isento?0:a.socio?S.cfg.vSocio:S.cfg.vNaoSocio;
 /* atleta mora no perímetro vedado (cidade, Flamengos, Feteira, P. Almoxarife) sem autorização da Comissão */
-const vedado=a=>{const u=usr(a.encId);const z=u&&S.cfg.zonas.find(z=>z.nome===u.freg);return !!(z&&z.restrita&&!a.autorizado)};
+const fregVedada=f=>{const z=S.cfg.zonas.find(z=>z.nome===f);return !!(z&&z.restrita)};
+const vedado=a=>{const u=usr(a.encId);return !a.autorizado&&!!u&&fregVedada(u.freg)};
+/* regra: as casas usadas no pedido (ou a principal, se o pedido não usa nenhuma) não podem estar na zona vedada, salvo autorização */
+function vedadoPedido(a,origem,destino){if(a.autorizado)return false;const u=usr(a.encId);const cs=casas(u);
+  const usadas=[origem,destino].map(casaIdx).filter(i=>i>=0).map(i=>cs[i]).filter(Boolean);
+  return (usadas.length?usadas:[cs[0]]).some(c=>fregVedada(c.freg))}
 const pago=(aid,m)=>S.pags.find(p=>p.atletaId===aid&&p.mes===m);
 function atraso(a){
   if(a.isento)return null;
@@ -200,15 +205,20 @@ function km(f1,f2){
 }
 const minDe=k=>k;
 /* Onde fica um local, para um atleta */
+/* moradas de um encarregado: 0 = principal, 1 e 2 = adicionais (ex.: casa do pai, casa dos avós) */
+function casas(u){const l=[{nome:'Casa',freg:u.freg,morada:u.morada}];(u.moradas||[]).forEach(m=>{if(m&&m.nome)l.push(m)});return l}
+const casaIdx=nome=>{const m=/^Casa(?::(\d))?$/.exec(nome);return m?+(m[1]||0):-1};
 function loc(nome,aid){
-  if(nome===CASA){const u=usr(atl(aid).encId);return {key:'casa:'+u.id,label:'Casa '+u.nome.split(' ').slice(-1)[0],freg:u.freg||S.cfg.base,base:false,morada:u.morada,semFreg:!u.freg}}
+  const ci=casaIdx(nome);
+  if(ci>=0){const u=usr(atl(aid).encId);const c=casas(u)[ci]||casas(u)[0];
+    return {key:'casa:'+u.id+':'+ci,label:(ci?c.nome:'Casa')+' '+u.nome.split(' ').slice(-1)[0],freg:c.freg||S.cfg.base,base:false,morada:c.morada,semFreg:!c.freg,casa:true}}
   const l=S.cfg.locais.find(x=>x.nome===nome);
   if(l)return {key:'l:'+l.nome,label:l.nome,freg:l.freg,base:!!l.base};
   const n=nome.toLowerCase();
   const z=S.cfg.zonas.find(z=>n.includes(z.nome.toLowerCase().replace(/^horta \((.*)\)$/,'$1')));
   return {key:'o:'+nome,label:nome,freg:z?z.nome:S.cfg.base,base:false,semFreg:!z};
 }
-const locLabel=(nome,aid)=>nome===CASA?'Casa ('+(usr(atl(aid).encId).freg||'?')+')':nome;
+const locLabel=(nome,aid)=>{const ci=casaIdx(nome);if(ci<0)return nome;const c=casas(usr(atl(aid).encId))[ci];return c?(ci?c.nome:'Casa')+' ('+(c.freg||'?')+')':'Morada inexistente'};
 /* pedido -> tarefa: 'ida' (vai para o treino/jogo) ou 'reg' (regressa de uma instalação do clube) */
 function job(p){
   const o=loc(p.origem,p.atletaId),d=loc(p.destino,p.atletaId);
@@ -380,7 +390,7 @@ function vEnc(){
   let h=topo()+`<div class="wrap">`;
   const at=meus.filter(a=>atraso(a));
   const vd=meus.filter(vedado);
-  if(vd.length)h+=`<div class="warn" style="margin-top:14px">A residência de ${vd.map(a=>esc(a.nome.split(' ')[0])).join(', ')} fica numa zona sem transporte do clube. Só é possível com autorização da Comissão de Gestão.</div>`;
+  if(vd.length)h+=`<div class="warn" style="margin-top:14px">A morada principal de ${vd.map(a=>esc(a.nome.split(' ')[0])).join(', ')} fica numa zona sem transporte do clube. Pedidos a partir dela só com autorização da Comissão de Gestão.</div>`;
   if(at.length)h+=`<div class="warn" style="margin-top:14px">⚠️ Mensalidade em atraso: ${at.map(a=>esc(a.nome.split(' ')[0])+' ('+fmtM(atraso(a))+')').join(', ')}. Não é possível pedir transporte até regularizar.</div>`;
   h+=`<div style="margin-top:16px"><button class="btn full" onclick="formPedido()">＋ Pedir transporte</button></div>`;
   h+=`<h2>Próximos pedidos <span class="n">${ped.filter(p=>p.estado!=='cancelado').length}</span></h2>`;
@@ -406,14 +416,15 @@ function cancelar(id){confirma('Cancelar este transporte?',async()=>{const p=S.p
 function formPedido(dataPre){
   const admin=me().role==='admin';
   const lista=admin?S.atletas.filter(a=>a.transporte&&usr(a.encId).estado==='ativo'):S.atletas.filter(a=>a.encId===me().id&&a.transporte);
-  const casa=admin?'Casa (morada do atleta)':'Casa ('+(me().freg||'morada registada')+')';
-  const locs=`<option value="${CASA}">${esc(casa)}</option>`+S.cfg.locais.map(l=>`<option>${esc(l.nome)}</option>`).join('')+'<option value="__o">Outro local…</option>';
+  const casaOpts=admin?`<option value="Casa">Casa principal do atleta</option><option value="Casa:1">Morada adicional 1 do atleta</option><option value="Casa:2">Morada adicional 2 do atleta</option>`
+    :casas(me()).map((c,i)=>`<option value="${i?'Casa:'+i:'Casa'}">${esc((i?c.nome:'Casa')+' ('+(c.freg||'?')+')')}</option>`).join('');
+  const locs=casaOpts+S.cfg.locais.map(l=>`<option>${esc(l.nome)}</option>`).join('')+'<option value="__o">Outro local…</option>';
   const dataDef=dataPre||(admin||prazoOk(hoje())?hoje():addDias(hoje(),1));
   let h=`<h3>${admin?'Registar pedido':'Pedir transporte'}</h3>`;
   if(!admin)h+=`<div class="mut">Para o próprio dia, até às ${esc(S.cfg.prazo)}.</div>`;
   h+=`<label class="f">Quem vai?</label>`;
   if(admin)h+=`<input type="text" id="fq" placeholder="Procurar atleta ou encarregado…" oninput="filtraAt()" style="margin-bottom:8px">`;
-  h+=`<div id="fat">`+lista.map(a=>{const at=atraso(a),ved=vedado(a);const dis=!admin&&(at||ved);return `<label class="chk ${dis?'dis':''}" data-s="${esc((a.nome+' '+usr(a.encId).nome).toLowerCase())}"><input type="checkbox" value="${a.id}" ${dis?'disabled':''} ${!admin&&lista.length===1&&!dis?'checked':''} onchange="this.parentNode.classList.toggle('on',this.checked)"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${esc(a.escalao)}${admin?' · '+esc(usr(a.encId).nome)+' · '+esc(usr(a.encId).freg||'?'):''}${at?` · <span style="color:var(--vm)">mensalidade em atraso</span>`:''}${ved?` · <span style="color:var(--vm)">zona sem transporte${admin?' (sem autorização)':' — requer autorização da Comissão de Gestão'}</span>`:''}</div></div></label>`}).join('')+`</div>`;
+  h+=`<div id="fat">`+lista.map(a=>{const at=atraso(a),ved=vedado(a);const dis=!admin&&at;return `<label class="chk ${dis?'dis':''}" data-s="${esc((a.nome+' '+usr(a.encId).nome).toLowerCase())}"><input type="checkbox" value="${a.id}" ${dis?'disabled':''} ${!admin&&lista.length===1&&!dis?'checked':''} onchange="this.parentNode.classList.toggle('on',this.checked)"><div class="grow"><div class="b">${esc(a.nome)}</div><div class="mut">${esc(a.escalao)}${admin?' · '+esc(usr(a.encId).nome)+' · '+esc(usr(a.encId).freg||'?'):''}${at?` · <span style="color:var(--vm)">mensalidade em atraso</span>`:''}${ved?` · <span style="color:var(--vm)">casa principal em zona sem transporte${admin?' (sem autorização)':''}</span>`:''}</div></div></label>`}).join('')+`</div>`;
   h+=`<label class="f">De onde</label><select id="fo" onchange="outro(this,'foo');lblHora()">${locs}</select><input type="text" id="foo" placeholder="Local e freguesia" style="display:none;margin-top:6px">
   <label class="f">Para onde</label><select id="fde" onchange="outro(this,'fdeo');lblHora()">${locs}</select><input type="text" id="fdeo" placeholder="Local e freguesia" style="display:none;margin-top:6px">
   <div class="two"><div><label class="f">Dia</label><input type="date" id="fd" value="${dataDef}" min="${admin?'':hoje()}"></div><div><label class="f" id="fhl">Tem de chegar às</label><input type="time" id="fh" value="17:00"></div></div>
@@ -438,6 +449,9 @@ async function gravaPedido(){
   if(!d||!hh)return err('Indique o dia e a hora.');
   if(!o||!de)return err('Indique de onde e para onde.');
   if(o===de)return err('A partida e o destino são iguais.');
+  for(const aid of ats){const a=atl(aid),cs=casas(usr(a.encId));
+    for(const x of [o,de]){const ci=casaIdx(x);if(ci>0&&!cs[ci])return err(`${a.nome.split(' ')[0]} não tem a morada adicional ${ci} registada.`)}
+    if(!admin&&vedadoPedido(a,o,de))return err(`${a.nome.split(' ')[0]}: esta morada fica numa zona sem transporte do clube. Só é possível com autorização da Comissão de Gestão.`)}
   if(!admin&&!prazoOk(d))return err(d<hoje()?'Não é possível pedir para dias passados.':`O prazo para hoje terminou às ${S.cfg.prazo}. Contacte o clube.`);
   if(fr.checked&&(!frh.value||frh.value<=hh))return err('A hora do regresso tem de ser depois da ida.');
   let n=0,dup=0;
@@ -492,7 +506,7 @@ function aDia(){
     <div class="mut sm">${j.tipo==='reg'?'Regresso · sai às':'Ida · chegar às'} ${esc(p.hora)} · <b>${esc(fz)}</b>${(j.o.semFreg||j.d.semFreg)?' <span style="color:var(--vm)">(freguesia desconhecida)</span>':''}</div>
     ${p.obs?`<div class="mut">📝 ${esc(p.obs)}</div>`:''}<div class="mut sm">${esc(u.nome)} · ${esc(u.tel)}</div></div><input type="checkbox" ${selP.has(p.id)?'checked':''} style="width:22px;height:22px;accent-color:var(--v);pointer-events:none"></div>
     ${at?`<div style="margin-top:6px"><span class="chip c-r">Mensalidade de ${fmtM(at)} em falta</span></div>`:''}
-    ${vedado(a)?`<div style="margin-top:6px"><span class="chip c-r">Zona vedada sem autorização da Comissão</span></div>`:''}
+    ${vedadoPedido(a,p.origem,p.destino)?`<div style="margin-top:6px"><span class="chip c-r">Zona vedada sem autorização da Comissão</span></div>`:''}
     <div class="acts" onclick="event.stopPropagation()"><button class="btn red sm" onclick="recusar('${p.id}')">Sem lugar</button></div></div>`;
   });
   h+=`<h2>Viagens <span class="n">${vs.length}</span></h2>`;
@@ -644,7 +658,7 @@ function aUsers(){
   encs.forEach(u=>{
     const as=S.atletas.filter(a=>a.encId===u.id),sus=u.estado==='suspenso';
     h+=`<div class="card" style="${sus?'opacity:.7':''}"><div class="row"><div class="grow"><div class="b">${esc(u.nome)}</div><div class="mut">${esc(u.tel)} · <b>${esc(u.freg||'sem freguesia')}</b>${u.morada?' · '+esc(u.morada):''}</div><div class="mut sm">utilizador: ${esc(u.username)}</div></div><span class="chip ${sus?'c-r':'c-v'}">${sus?'Suspenso':'Ativo'}</span></div>
-    ${!u.freg?'<div class="warn" style="padding:6px 10px">Sem freguesia — o otimizador assume a Horta.</div>':''}
+    ${!u.freg?'<div class="warn" style="padding:6px 10px">Sem freguesia — o otimizador assume a Horta.</div>':''}${(u.moradas||[]).length?`<div class="mut sm">+ ${(u.moradas||[]).map(m=>esc(m.nome)+' ('+esc(m.freg)+')').join(' · ')}</div>`:''}
     <div style="margin-top:6px">${as.map(a=>`<span class="chip ${a.transporte?'c-b':'c-g'}" style="margin:2px 4px 2px 0">${esc(a.nome.split(' ')[0])} · ${a.isento?'isento':a.socio?'sócio':'não sócio'}${a.autorizado?' · autorizado':''}${vedado(a)?' · 🚫 zona vedada':''}${atraso(a)?' · ⚠️':''}</span>`).join('')}</div>
     <div class="acts"><button class="btn gh sm" onclick="formUser('${u.id}')">Editar</button><button class="btn gh sm" onclick="novaPass('${u.id}')">Nova palavra-passe</button>${sus?`<button class="btn sm" onclick="estadoU('${u.id}','ativo')">Reativar</button>`:`<button class="btn red sm" onclick="estadoU('${u.id}','suspenso')">Suspender</button>`}</div></div>`;
   });
@@ -676,6 +690,8 @@ function formUser(id){
   <div class="two"><div><label class="f">Telemóvel</label><input type="tel" id="ut" value="${esc(u?u.tel:'')}"></div><div><label class="f">Utilizador</label><input type="text" id="uu" autocapitalize="none" value="${esc(u?u.username:'')}" oninput="this._m=1"></div></div>
   <div class="two"><div><label class="f">Freguesia</label><select id="uf" onchange="avFreg()"><option value="">— escolher —</option>${fregOpts(u?u.freg:'')}</select></div><div><label class="f">Morada / lugar</label><input type="text" id="um" value="${esc(u?u.morada:'')}" placeholder="Ex.: Canada do Pilar, 12"></div></div>
   <div class="mut sm" id="ufv" style="margin-top:6px"></div>
+  <label class="f">Moradas adicionais (opcional — pais separados, avós…)</label>
+  ${[0,1].map(i=>{const m=(u&&u.moradas&&u.moradas[i])||{};return `<div class="card" style="padding:10px;margin-bottom:8px"><div class="two"><input type="text" id="mn${i}" value="${esc(m.nome||'')}" placeholder="Ex.: Casa do pai / Casa dos avós"><select id="mf${i}"><option value="">— freguesia —</option>${fregOpts(m.freg||'')}</select></div><input type="text" id="mm${i}" value="${esc(m.morada||'')}" placeholder="Morada / lugar" style="margin-top:6px"></div>`}).join('')}
   <label class="f">Atletas</label><div id="uat"></div><button class="btn gh sm" onclick="lerAt();fAt.push({id:uid(),nome:'',escalao:'',socio:false,transporte:true,inicio:mesAtual(),autorizado:false,isento:false,decisao:''});desAt()">＋ Adicionar atleta</button>
   <datalist id="esc">${['Traquinas (fut.)','Benjamins (fut.)','Infantis (fut.)','Iniciados (fut.)','Juvenis (fut.)','Juniores (fut.)','Seniores fem. (fut.)','Minis (basq.)','Iniciados (basq.)','Cadetes (basq.)','Juniores (basq.)','Infantis (vol.)','Iniciados (vol.)','Cadetes (vol.)','Juvenis (vol.)'].map(x=>`<option value="${x}">`).join('')}</datalist>
   <div class="err" id="ue"></div>
@@ -702,17 +718,20 @@ async function gravaUser(id){
   if(!ats.length)return err('Adicione pelo menos um atleta.');
   if(ats.some(a=>!a.escalao))return err('Indique o escalão de cada atleta.');
   if(ats.some(a=>(a.autorizado||a.isento)&&!a.decisao))return err('Indique a referência da decisão da Comissão para cada autorização ou isenção.');
+  const moradas=[0,1].map(i=>({nome:document.getElementById('mn'+i).value.trim(),freg:document.getElementById('mf'+i).value,morada:document.getElementById('mm'+i).value.trim()})).filter(m=>m.nome||m.freg||m.morada);
+  if(moradas.some(m=>!m.nome||!m.freg))return err('Cada morada adicional precisa de um nome e da freguesia.');
   ugb.disabled=true;err('A gravar…');
   let u,pass=null;
   try{
     if(id){u=usr(id);
       if(u.username!==user){await fn({acao:'username',id,username:user});u.username=user}
-      Object.assign(u,{nome,tel,freg,morada:um.value.trim()});
+      Object.assign(u,{nome,tel,freg,morada:um.value.trim(),moradas});
       await db(sb.from('profiles').update(linha('profiles',u)).eq('id',id));
     }else{
       pass=genPass();
       const r=await fn({acao:'criar',username:user,password:pass,nome,tel,freg,morada:um.value.trim()});
-      u={id:r.id,nome,tel,username:user,freg,role:'enc',estado:'ativo',morada:um.value.trim()};S.users.push(u);
+      u={id:r.id,nome,tel,username:user,freg,role:'enc',estado:'ativo',morada:um.value.trim(),moradas:[]};S.users.push(u);
+      if(moradas.length){u.moradas=moradas;await db(sb.from('profiles').update({moradas}).eq('id',u.id))}
     }
   }catch(x){ugb.disabled=false;return err(x.message)}
   const keep=ats.map(a=>a.id);
